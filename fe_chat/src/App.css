@@ -1,0 +1,110 @@
+body {
+  background: linear-gradient(to right, #6a11cb, #2575fc);
+  font-family: 'Roboto', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.App {
+  display: flex;
+  flex-direction: column;
+  height: 90vh;
+  width: 100%;
+  margin: 0 auto;
+  background-color: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  width: 640px;
+}
+
+.chat-window {
+  flex-grow: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background-color: #f9f9f9;
+}
+
+.message {
+  padding: 0.75rem 1.25rem;
+  border-radius: 1.5rem;
+  max-width: 75%;
+  line-height: 1.4;
+}
+
+.user {
+  background: linear-gradient(to right, #007bff, #0056b3);
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 0.5rem;
+}
+
+.assistant {
+  background-color: #e9e9eb;
+  color: black;
+  align-self: flex-start;
+  border-bottom-left-radius: 0.5rem;
+}
+
+.chat-form {
+  display: flex;
+  padding: 1.5rem;
+  border-top: 1px solid #ddd;
+  background-color: #fff;
+}
+
+.chat-form input {
+  flex-grow: 1;
+  padding: 0.75rem;
+  border: 2px solid #ddd;
+  border-radius: 2rem;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.chat-form input:focus {
+  border-color: #007bff;
+}
+
+.chat-form button {
+  margin-left: 1rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: linear-gradient(to right, #007bff, #0056b3);
+  color: white;
+  border-radius: 2rem;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.chat-form button:hover {
+  background: linear-gradient(to right, #0056b3, #007bff);
+}
+
+.message p {
+  margin: 0;
+}
+
+.message ul, .message ol {
+  padding-left: 20px;
+}
+
+.message code {
+  background-color: #eee;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.message pre {
+  background-color: #eee;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
