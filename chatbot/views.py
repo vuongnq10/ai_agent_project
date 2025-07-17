@@ -4,6 +4,7 @@ import os
 import google.generativeai as genai
 
 GEMINI_MODEL = "gemini-2.5-flash"
+API_KEY = os.getenv("GOOGLE_API_KEY")
 
 
 def chat(request):
@@ -14,13 +15,13 @@ def chat(request):
             return JsonResponse({"error": "Message not provided"}, status=400)
 
         # Configure the Generative AI model
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
+
+        if not API_KEY:
             return JsonResponse(
                 {"error": "GOOGLE_API_KEY environment variable not set"}, status=500
             )
 
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel(GEMINI_MODEL)
 
         # Send message to the Generative AI model
