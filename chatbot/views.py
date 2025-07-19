@@ -5,7 +5,7 @@
 from django.http import JsonResponse
 import os
 import google.generativeai as genai
-from cx_connector.cx_connector import hello_world
+from cx_connector.cx_connector import get_data
 
 GEMINI_MODEL = "gemini-1.5-flash"
 API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -39,8 +39,8 @@ def chat(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-def hello_world_api(request):
-    result = hello_world()
+def ticker_data(request):
+    result = get_data()
     return JsonResponse(result)
 
 

@@ -15,7 +15,6 @@ def ticker_ohlcv(symbol, timeframe):
     return ohlcv
 
 
-def hello_world():
-    print("Hello, world!")
+def get_data():
     data = ticker_ohlcv("SOL/USDT", "1h")
     return {"data": data}
