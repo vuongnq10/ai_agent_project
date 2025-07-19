@@ -1,5 +1,6 @@
 import ccxt
 from fastmcp import FastMCP
+import random
 
 binance = ccxt.binance({})
 mcp = FastMCP(name="CX Connector", version="1.0.0")
@@ -14,7 +15,10 @@ def add(a: int, b: int):
     :param b: Second number.
     :return: The sum of a and b.
     """
-    return a + b
+
+    print(f"Adding {a} and {b}")
+
+    return f"The sum of {a} and {b} is {a + b}"
 
 
 @mcp.tool()
@@ -26,7 +30,17 @@ def times(a: int, b: int):
     :param b: Second number.
     :return: The product of a and b.
     """
-    return a * b
+    print(f"Multiplying {a} and {b}")
+
+    return f"The product of {a} and {b} is {a * b}"
+
+
+@mcp.tool()
+def get_random_number():
+    """
+    Returns a random number between 0 and 100.
+    """
+    return random.randint(0, 100)
 
 
 @mcp.tool()
