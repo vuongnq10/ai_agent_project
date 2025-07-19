@@ -1,4 +1,5 @@
 django
 python-dotenv
-google-generativeai
 django-cors-headers
+langchain
+langchain-google-genai
