@@ -1,9 +1,36 @@
 import ccxt
+from fastmcp import FastMCP
 
 binance = ccxt.binance({})
+mcp = FastMCP(name="CX Connector", version="1.0.0")
 
 
-def ticker_ohlcv(symbol, timeframe):
+@mcp.tool()
+def add(a: int, b: int):
+    """
+    Returns the sum of two numbers.
+
+    :param a: First number.
+    :param b: Second number.
+    :return: The sum of a and b.
+    """
+    return a + b
+
+
+@mcp.tool()
+def times(a: int, b: int):
+    """
+    Returns the product of two numbers.
+
+    :param a: First number.
+    :param b: Second number.
+    :return: The product of a and b.
+    """
+    return a * b
+
+
+@mcp.tool()
+def ticker_ohlcv(symbol: str, timeframe: str):
     """
     Fetches the ticker price for a given symbol and timeframe.
 
@@ -18,3 +45,7 @@ def ticker_ohlcv(symbol, timeframe):
 def get_data():
     data = ticker_ohlcv("SOL/USDT", "1h")
     return {"data": data}
+
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")

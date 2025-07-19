@@ -4,3 +4,5 @@ django-cors-headers
 langchain
 langchain-google-genai
 ccxt
+fastmcp
+uvicorn
