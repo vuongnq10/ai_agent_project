@@ -1,6 +1,6 @@
 # agent.py
 import google.generativeai as genai
-from tools.tool_server import ToolServer
+from chatbot.tool_server import ToolServer
 import os
 
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -142,5 +142,5 @@ class Agent:
         except Exception as e:
             return f"Error processing request: {str(e)}\nContext: Ensure the request is clear and specific."
 
-    def __call__(self, prompt: str) -> str:
-        return self.call_agent(prompt)
+    # def __call__(self, prompt: str) -> str:
+    #     return self.call_agent(prompt)

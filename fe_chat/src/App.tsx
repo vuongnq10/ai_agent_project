@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import "./App.css";
 
 const PROMPT =
-  "Give me 2 random numbers between 1 and 10, if both of them are event, give me the sum of them.";
+  "Give me 2 random numbers between 1 and 10, if both of them are even, give me the sum of them.";
 
 function App() {
   const [message, setMessage] = useState(PROMPT);
