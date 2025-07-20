@@ -3,8 +3,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
 
+const PROMPT =
+  "Give me 2 random numbers between 1 and 10, if both of them are event, give me the sum of them.";
+
 function App() {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(PROMPT);
   const [chatHistory, setChatHistory] = useState<
     { role: string; content: string }[]
   >([]);
@@ -24,7 +27,7 @@ function App() {
     setLoading(true);
     const userMessage = { role: "user", content: message };
     setChatHistory((prev) => [...prev, userMessage]);
-    setMessage("");
+    setMessage(PROMPT);
 
     try {
       const response = await fetch(

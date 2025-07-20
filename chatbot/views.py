@@ -4,15 +4,17 @@
 
 from django.http import JsonResponse
 import os
-import requests
-import json
-import google.generativeai as genai
-from cx_connector.tool_server import ToolServer
 from tools.agent import Agent
+
+# import requests
+# import json
+# import google.generativeai as genai
+# from cx_connector.tool_server import ToolServer
+
 
 GEMINI_MODEL = "gemini-1.5-flash"
 API_KEY = os.getenv("GOOGLE_API_KEY")
-tools = ToolServer()
+# tools = ToolServer()
 agent = Agent()
 
 
@@ -23,94 +25,94 @@ def chat(request):
     return JsonResponse({"success": True, "message": response})
 
 
-def chat_1(request):
-    try:
-        user_message = request.GET.get("query")
+# def chat_1(request):
+#     try:
+#         user_message = request.GET.get("query")
 
-        if not user_message:
-            return JsonResponse({"error": "Message not provided"}, status=400)
+#         if not user_message:
+#             return JsonResponse({"error": "Message not provided"}, status=400)
 
-        # Configure the Generative AI model
+#         # Configure the Generative AI model
 
-        if not API_KEY:
-            return JsonResponse(
-                {"error": "GOOGLE_API_KEY environment variable not set"}, status=500
-            )
+#         if not API_KEY:
+#             return JsonResponse(
+#                 {"error": "GOOGLE_API_KEY environment variable not set"}, status=500
+#             )
 
-        genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel(GEMINI_MODEL, tools=tools.get_tools_config())
+#         genai.configure(api_key=API_KEY)
+#         model = genai.GenerativeModel(GEMINI_MODEL, tools=tools.get_tools_config())
 
-        # Send message to the Generative AI model
-        response = model.generate_content(user_message)
+#         # Send message to the Generative AI model
+#         response = model.generate_content(user_message)
 
-        ai_message = response.text
-        return JsonResponse({"message": ai_message})
+#         ai_message = response.text
+#         return JsonResponse({"message": ai_message})
 
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+#     except Exception as e:
+#         return JsonResponse({"error": str(e)}, status=500)
 
 
-def chat_new(request):
-    try:
-        user_message = request.GET.get("query")
+# def chat_new(request):
+#     try:
+#         user_message = request.GET.get("query")
 
-        genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel(GEMINI_MODEL)
-        # response = model.generate_content(user_message)
+#         genai.configure(api_key=API_KEY)
+#         model = genai.GenerativeModel(GEMINI_MODEL)
+#         # response = model.generate_content(user_message)
 
-        system_prompt = """You are a tool-aware assistant. 
-        If the user's message requires using a tool, respond ONLY in this JSON format:
-        {
-            "tool": "<tool_name>",
-            "parameters": {
-                "param1": "value1",
-                "param2": "value2"
-            }
-        }
-        If no tool is needed, respond like:
-        {
-            "reply": "<your message to the user>"
-        }
-        """
-        response = model.generate_content(
-            [
-                {"role": "system", "parts": [system_prompt]},
-                {"role": "user", "parts": [user_message]},
-            ]
-        )
+#         system_prompt = """You are a tool-aware assistant.
+#         If the user's message requires using a tool, respond ONLY in this JSON format:
+#         {
+#             "tool": "<tool_name>",
+#             "parameters": {
+#                 "param1": "value1",
+#                 "param2": "value2"
+#             }
+#         }
+#         If no tool is needed, respond like:
+#         {
+#             "reply": "<your message to the user>"
+#         }
+#         """
+#         response = model.generate_content(
+#             [
+#                 {"role": "system", "parts": [system_prompt]},
+#                 {"role": "user", "parts": [user_message]},
+#             ]
+#         )
 
-        print(f"AI response: {response.text}")
+#         print(f"AI response: {response.text}")
 
-        parsed = response.text.strip()
+#         parsed = response.text.strip()
 
-        # Step 1: Parse the AI response
-        try:
-            parsed_json = json.loads(parsed)
-        except Exception as parse_err:
-            return JsonResponse({"error": f"Invalid AI response: {parsed}"}, status=500)
+#         # Step 1: Parse the AI response
+#         try:
+#             parsed_json = json.loads(parsed)
+#         except Exception as parse_err:
+#             return JsonResponse({"error": f"Invalid AI response: {parsed}"}, status=500)
 
-        print(f"Parsed response: {parsed_json}")
+#         print(f"Parsed response: {parsed_json}")
 
-        # Step 2: Call tool if needed
-        if "tool" in parsed_json:
-            tool_name = parsed_json["tool"]
-            parameters = parsed_json.get("parameters", {})
-            mcp_response = requests.post(
-                MCP_URL, json={"tool": tool_name, "input": parameters}
-            )
-            return JsonResponse({"tool": tool_name, "result": mcp_response.json()})
+#         # Step 2: Call tool if needed
+#         if "tool" in parsed_json:
+#             tool_name = parsed_json["tool"]
+#             parameters = parsed_json.get("parameters", {})
+#             mcp_response = requests.post(
+#                 MCP_URL, json={"tool": tool_name, "input": parameters}
+#             )
+#             return JsonResponse({"tool": tool_name, "result": mcp_response.json()})
 
-        print("No tool needed, returning Gemini's reply.")
+#         print("No tool needed, returning Gemini's reply.")
 
-        # Otherwise, return Gemini's reply
-        return JsonResponse({"message": parsed_json.get("reply", "[No reply]")})
+#         # Otherwise, return Gemini's reply
+#         return JsonResponse({"message": parsed_json.get("reply", "[No reply]")})
 
-        # ai_message = response.text
+#         # ai_message = response.text
 
-        # return JsonResponse({"message": ai_message})
+#         # return JsonResponse({"message": ai_message})
 
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+#     except Exception as e:
+#         return JsonResponse({"error": str(e)}, status=500)
 
 
 # def ticker_data(request):
