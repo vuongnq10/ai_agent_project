@@ -28,14 +28,17 @@ class Agent:
                 "max_output_tokens": 2048,
             },
             tools=tools_config,
+            tool_config={"function_calling_config": "ANY"},
         )
 
     def execute_tool(self, tool_name: str, **kwargs) -> str:
         return self.tool_server.execute_tool(tool_name, **kwargs)
 
     def call_agent(self, prompt: str) -> str:
-        chat = self.model.start_chat(system_instruction=prompt)
-        response = chat.send_message("Start")
+        chat = self.model.start_chat()
+        response = chat.send_message(prompt)
+
+        print("Initial response:", response)
 
         function_calls = []
         # results = []
@@ -44,7 +47,7 @@ class Agent:
             candidate = response.candidates[0]
             finish_reason = candidate.finish_reason
 
-            if finish_reason == "stop":
+            if finish_reason == "STOP":
                 print("✅ Final result:", candidate.content.parts[0].text)
                 return candidate.content.parts[0].text
 
@@ -60,11 +63,6 @@ class Agent:
                             args = part.function_call.args
 
                             result = self.execute_tool(tool_name, **args)
-
-                            # args_str = ", ".join(f"{k}={v}" for k, v in args.items())
-
-                            # function_calls.append(f"{tool_name}({args_str})")
-                            # results.append(str(result))
 
                             response = chat.send_message(
                                 content=genai.types.Content(
@@ -142,5 +140,5 @@ class Agent:
         except Exception as e:
             return f"Error processing request: {str(e)}\nContext: Ensure the request is clear and specific."
 
-    # def __call__(self, prompt: str) -> str:
-    #     return self.call_agent(prompt)
+    def __call__(self, prompt: str) -> str:
+        return self.call_agent(prompt)
