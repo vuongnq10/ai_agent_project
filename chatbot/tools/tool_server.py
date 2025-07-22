@@ -1,7 +1,8 @@
 # tool_server.py
 from dataclasses import dataclass
 from typing import Any, Callable
-import random
+
+from chatbot.tools.calculator import Calculator
 
 
 @dataclass
@@ -17,37 +18,18 @@ class ToolServer:
         self.tools = {}
         self.register_tools()
 
-    @staticmethod
-    def gen_random(start=0, end=100):
-        return random.randint(int(start), int(end))
-
-    @staticmethod
-    def answer_random(number: int):
-        return f"Generated random number: {number}"
-
-    @staticmethod
-    def sum_numbers(a: int, b: int) -> int:
-        """Sum two numbers."""
-        return a + b
-
     def register_tools(self):
         self.register_tool(
             "gen_random",
-            self.gen_random,
+            Calculator.gen_random,
             "Generate a random number between start and end (inclusive).",
             {"start": "integer", "end": "integer"},
         )
         self.register_tool(
             "sum_numbers",
-            self.sum_numbers,
+            Calculator.sum_numbers,
             "Sum two integers.",
             {"a": "integer", "b": "integer"},
-        )
-        self.register_tool(
-            "answer_random",
-            self.answer_random,
-            "Format the answer for a random number.",
-            {"number": "integer"},
         )
 
     def register_tool(
@@ -85,5 +67,5 @@ class ToolServer:
                     },
                 }
             )
-
+        print([{"function_declarations": function_declarations}])
         return [{"function_declarations": function_declarations}]

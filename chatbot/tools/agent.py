@@ -1,6 +1,6 @@
 # agent.py
 import google.generativeai as genai
-from chatbot.tool_server import ToolServer
+from chatbot.tools.tool_server import ToolServer
 import os
 import json
 
