@@ -4,6 +4,8 @@ from typing import Any, Callable
 
 from chatbot.tools.calculator import Calculator
 
+calculator = Calculator()
+
 
 @dataclass
 class Tool:
@@ -19,23 +21,8 @@ class ToolServer:
         self.register_tools()
 
     def register_tools(self):
-        self.register_tool(
-            "gen_random",
-            Calculator.gen_random,
-            "Generate a random number between start and end (inclusive).",
-            {"start": "integer", "end": "integer"},
-        )
-        self.register_tool(
-            "sum_numbers",
-            Calculator.sum_numbers,
-            "Sum two integers.",
-            {"a": "integer", "b": "integer"},
-        )
-
-    def register_tool(
-        self, name: str, func: Callable, description: str, input_params: dict
-    ):
-        self.tools[name] = Tool(name, func, description, input_params)
+        calculator_tools = calculator.tools
+        self.tools.update(calculator_tools)
 
     def execute_tool(self, tool_name: str, **kwargs) -> Any:
         """Execute a tool directly by name with given arguments"""

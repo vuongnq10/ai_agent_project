@@ -64,13 +64,13 @@ class CXConnector:
 
         return random.randint(0, 100)
 
-    def start(self):
-        self.mcp.run(
-            transport="http",
-            host="127.0.0.1",
-            port=8001,
-        )
+#     def start(self):
+#         self.mcp.run(
+#             transport="http",
+#             host="127.0.0.1",
+#             port=8001,
+#         )
 
 
-if __name__ == "__main__":
-    CXConnector().start()
+# if __name__ == "__main__":
+#     CXConnector().start()
