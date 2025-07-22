@@ -2,6 +2,7 @@
 import google.generativeai as genai
 from chatbot.tool_server import ToolServer
 import os
+import json
 
 GEMINI_MODEL = "gemini-2.5-flash"
 API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -28,7 +29,7 @@ class Agent:
                 "max_output_tokens": 2048,
             },
             tools=tools_config,
-            tool_config={"function_calling_config": "ANY"},
+            # tool_config={"function_calling_config": "ANY"},
         )
 
     def execute_tool(self, tool_name: str, **kwargs) -> str:
@@ -38,107 +39,43 @@ class Agent:
         chat = self.model.start_chat()
         response = chat.send_message(prompt)
 
-        print("Initial response:", response)
-
-        function_calls = []
-        # results = []
-
         while True:
-            candidate = response.candidates[0]
-            finish_reason = candidate.finish_reason
-
-            if finish_reason == "STOP":
-                print("✅ Final result:", candidate.content.parts[0].text)
-                return candidate.content.parts[0].text
-
-            for candidate in response.candidates:
-                if not candidate.content.parts:
-                    continue
-
-                for part in candidate.content.parts:
-                    if hasattr(part, "function_call") and part.function_call:
-                        try:
-
-                            tool_name = part.function_call.name
-                            args = part.function_call.args
-
-                            result = self.execute_tool(tool_name, **args)
-
-                            response = chat.send_message(
-                                content=genai.types.Content(
-                                    role="tool",
-                                    parts=[
-                                        genai.types.Part(
-                                            function_response={
-                                                "name": tool_name,
-                                                "response": result,
-                                            }
-                                        )
-                                    ],
-                                )
-                            )
-
-                        except Exception as e:
-                            function_calls.append(f"{tool_name} (failed)")
-                            # results.append(f"Error: {str(e)}")
-
-    def call_agent_old(self, prompt: str) -> str:
-        try:
-            enhanced_prompt = prompt
-
-            print(enhanced_prompt)
-
-            # Start chat and get response
-            chat = self.model.start_chat()
-            response = chat.send_message(enhanced_prompt)
-
-            print(response)
-
-            if not response.candidates:
-                return "No response was generated."
-
             function_calls = []
-            results = []
-
-            # Process each part of the response
             for candidate in response.candidates:
-                if not candidate.content.parts:
-                    continue
+                if candidate.content.parts:
+                    for part in candidate.content.parts:
+                        if hasattr(part, "function_call") and part.function_call:
+                            function_calls.append(part.function_call)
 
-                for part in candidate.content.parts:
-                    if hasattr(part, "function_call") and part.function_call:
-                        try:
+            if len(function_calls) == 0:
+                print("✅ Final result:", response.text)
+                return response.text
 
-                            tool_name = part.function_call.name
-                            args = part.function_call.args
+            tool_responses = []
+            for func_call in function_calls:
+                tool_name = func_call.name
+                args = dict(func_call.args)
 
-                            result = self.execute_tool(tool_name, **args)
+                # result = self.execute_tool(tool_name, **args)
 
-                            args_str = ", ".join(f"{k}={v}" for k, v in args.items())
+                tool_result = self.execute_tool(tool_name, **args)
+                tool_responses.append({"name": tool_name, "content": tool_result})
 
-                            function_calls.append(f"{tool_name}({args_str})")
-                            results.append(str(result))
+            # Build tool response message
+            tool_message = {"role": "function", "parts": []}
+            for resp in tool_responses:
+                tool_message["parts"].append(
+                    {
+                        "function_response": {
+                            "name": resp["name"],
+                            "response": resp["content"],
+                        }
+                    }
+                )
 
-                        except Exception as e:
-                            function_calls.append(f"{tool_name} (failed)")
-                            results.append(f"Error: {str(e)}")
-
-            # Format the response
-            if not function_calls:
-                return "No tools were called. Try rephrasing your request."
-
-            steps = "\n".join(
-                [
-                    f"\n {i+1}. Called {call} → {result}"
-                    for i, (call, result) in enumerate(zip(function_calls, results))
-                ]
-            )
-
-            return f"""Tool Execution Steps: 
-                    {steps}"""
-
-        except Exception as e:
-            return f"Error processing request: {str(e)}\nContext: Ensure the request is clear and specific."
+            # Send tool responses to Gemini
+            response = chat.send_message(json.dumps(tool_message))
+            print("Debug Tool responses:", response)
 
     def __call__(self, prompt: str) -> str:
         return self.call_agent(prompt)

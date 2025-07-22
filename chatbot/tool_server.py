@@ -47,7 +47,7 @@ class ToolServer:
             "answer_random",
             self.answer_random,
             "Format the answer for a random number.",
-            {"random": "integer"},
+            {"number": "integer"},
         )
 
     def register_tool(
