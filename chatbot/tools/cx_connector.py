@@ -30,7 +30,7 @@ class CXConnector:
         )
 
     @staticmethod
-    def ticker_ohlcv(symbol, timeframe):
+    def ticker_ohlcv(symbol: str, timeframe: str):
         """
         Fetches the ticker price for a given symbol and timeframe.
 
@@ -40,6 +40,6 @@ class CXConnector:
         """
         ohlcv = binance.fetch_ohlcv(symbol, timeframe)
 
-        print(f"📈 Fetched OHLCV data for {symbol} at {timeframe} timeframe: {ohlcv}")
+        print(f"📈 Fetched OHLCV data for {symbol} at {timeframe} timeframe")
 
         return ohlcv

@@ -1,5 +1,8 @@
+import ccxt
 import random
 from google.generativeai.types import Tool, FunctionDeclaration
+
+binance = ccxt.binance({})
 
 
 class Calculator:
@@ -33,6 +36,24 @@ class Calculator:
                         "required": ["a", "b"],
                     },
                 ),
+                FunctionDeclaration(
+                    name="get_ticker",
+                    description="Fetch ticker data for a given symbol and timeframe.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "symbol": {
+                                "type": "string",
+                                "description": "The trading pair symbol (e.g., 'SOL/USDT').",
+                            },
+                            "timeframe": {
+                                "type": "string",
+                                "description": "The timeframe for the OHLCV data (e.g., '1h', '30m').",
+                            },
+                        },
+                        "required": ["symbol", "timeframe"],
+                    },
+                ),
             ]
         )
 
@@ -50,35 +71,14 @@ class Calculator:
 
         return a + b
 
-    # def register_tools(self):
-    #     return Tool(
-    #         function_declarations=[
-    #             FunctionDeclaration(
-    #                 name="gen_random",
-    #                 description="Generate a random integer between start and end.",
-    #                 parameters={
-    #                     "type": "object",
-    #                     "properties": {
-    #                         "start": {
-    #                             "type": "integer",
-    #                             "description": "Start of range",
-    #                         },
-    #                         "end": {"type": "integer", "description": "End of range"},
-    #                     },
-    #                     "required": ["start", "end"],
-    #                 },
-    #             ),
-    #             FunctionDeclaration(
-    #                 name="sum_numbers",
-    #                 description="Sum two integers.",
-    #                 parameters={
-    #                     "type": "object",
-    #                     "properties": {
-    #                         "a": {"type": "integer", "description": "First number"},
-    #                         "b": {"type": "integer", "description": "Second number"},
-    #                     },
-    #                     "required": ["a", "b"],
-    #                 },
-    #             ),
-    #         ]
-    #     )
+    @staticmethod
+    def get_ticker(symbol: str, timeframe: str):
+        """
+        Mock function to simulate fetching ticker data.
+        In a real implementation, this would fetch data from an exchange.
+        """
+        print(f"📈 Fetching ticker data for {symbol} at {timeframe} timeframe")
+        ohlcv = binance.fetch_ohlcv(symbol, timeframe)
+
+        print(f"📈 Fetched OHLCV data for {symbol} at {timeframe} timeframe: {ohlcv}")
+        return ohlcv
