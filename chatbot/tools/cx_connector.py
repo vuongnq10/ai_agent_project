@@ -26,6 +26,42 @@ class CXConnector:
                         "required": ["symbol", "timeframe"],
                     },
                 ),
+                FunctionDeclaration(
+                    name="save_trade_setup",
+                    description="Saves a trade setup with symbol, order type, entry price, stop loss, and take profit.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "symbol": {
+                                "type": "string",
+                                "description": "The trading pair symbol (e.g., 'SOL/USDT').",
+                            },
+                            "order_type": {
+                                "type": "string",
+                                "description": "Type of order (e.g., 'buy', 'sell').",
+                            },
+                            "entry": {
+                                "type": "number",
+                                "description": "Entry price for the trade.",
+                            },
+                            "stop_loss": {
+                                "type": "number",
+                                "description": "Stop loss price for the trade.",
+                            },
+                            "take_profit": {
+                                "type": "number",
+                                "description": "Take profit price for the trade.",
+                            },
+                        },
+                        "required": [
+                            "symbol",
+                            "order_type",
+                            "entry",
+                            "stop_loss",
+                            "take_profit",
+                        ],
+                    },
+                ),
             ]
         )
 
@@ -43,3 +79,21 @@ class CXConnector:
         print(f"📈 Fetched OHLCV data for {symbol} at {timeframe} timeframe")
 
         return ohlcv
+
+    @staticmethod
+    def save_trade_setup(
+        symbol: str,
+        order_type: str,
+        entry: float,
+        stop_loss: float,
+        take_profit: float,
+    ):
+        try:
+            string = f"Placing {order_type} order of {symbol} at price {entry}, stop loss at {stop_loss}, take profit at {take_profit}"
+
+            print(string)
+            # asyncio.run(telegram_bot(string))
+
+            return {"status": "success", "message": string}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
