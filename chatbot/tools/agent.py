@@ -15,15 +15,13 @@ class Agent:
         self.calculator = Calculator()
         self.cx_connector = CXConnector()
 
-        print(self.calculator.tools)
-
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             generation_config={
                 "temperature": 0.7,
                 # "max_output_tokens": 2048,
             },
-            tools=[self.calculator.tools],
+            tools=[self.cx_connector.tools],
         )
 
     def call_agent(self, prompt: str) -> str:
@@ -33,6 +31,7 @@ class Agent:
         print("🤖 Agent response:", response)
 
         while True:
+            print("🤖 Waiting for function calls...")
             function_calls = []
             for candidate in response.candidates:
                 if candidate.content.parts:

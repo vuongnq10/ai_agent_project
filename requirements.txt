@@ -7,3 +7,4 @@ google-generativeai
 ccxt
 fastmcp
 uvicorn
+pandas
