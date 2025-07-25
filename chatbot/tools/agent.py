@@ -14,21 +14,22 @@ client = Client(api_key=API_KEY, http_options=HttpOptions(api_version="v1alpha")
 class Agent:
 
     def call_agent(self, prompt: str) -> str:
+        history = [Content(role="user", parts=[Part.from_text(text=prompt)])]
 
         response = client.models.generate_content(
             model=GEMINI_MODEL,
-            contents=[Content(role="user", parts=[Part.from_text(text=prompt)])],
+            contents=history,
             config=GenerateContentConfig(tools=[calculator.tools]),
         )
 
         print("🤖 Agent response:", response)
+        history.append(response.candidates[0].content)
 
         while True:
             print("🤖 Waiting for function calls...")
             function_calls = []
-            # contents = []
             for candidate in response.candidates:
-                # contents.append(candidate.content)
+                history.append(candidate.content)
                 if candidate.content.parts:
                     for part in candidate.content.parts:
                         if hasattr(part, "function_call") and part.function_call:
@@ -52,20 +53,24 @@ class Agent:
                         response=tool_result,
                     )
                 except (AttributeError, TypeError) as e:
-                    function_response = (
-                        f"Error: Tool {tool_name} not found or not callable."
+                    function_response = Part.from_text(
+                        text=f"Error: Tool {tool_name} not found or not callable. {e}"
                     )
                 except Exception as e:
-                    function_response = f"Error: {str(e)}"
+                    function_response = Part.from_text(text=f"Error: {str(e)}")
 
                 tool_responses.append(function_response)
+
             print("🤖 Tool responses:", tool_responses)
+            history.append(Content(role="tool", parts=tool_responses))
+
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=[Content(role="tool", parts=tool_responses)],
+                contents=history,
                 config=GenerateContentConfig(tools=[calculator.tools]),
             )
-            print("🤖 Tool responses:", tool_responses)
+            print("🤖 Agent response after tool call:", response)
+            history.append(response.candidates[0].content)
 
     def __call__(self, prompt: str) -> str:
         return self.call_agent(prompt)
