@@ -3,7 +3,7 @@ python-dotenv
 django-cors-headers
 langchain
 langchain-google-genai
-google-generativeai
+google-genai
 ccxt
 fastmcp
 uvicorn
