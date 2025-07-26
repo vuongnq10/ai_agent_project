@@ -14,22 +14,22 @@ client = Client(api_key=API_KEY, http_options=HttpOptions(api_version="v1alpha")
 class Agent:
 
     def call_agent(self, prompt: str) -> str:
-        history = [Content(role="user", parts=[Part.from_text(text=prompt)])]
+        # history = [Content(role="user", parts=[Part.from_text(text=prompt)])]
 
         response = client.models.generate_content(
             model=GEMINI_MODEL,
-            contents=history,
+            contents=[Content(role="user", parts=[Part.from_text(text=prompt)])],
             config=GenerateContentConfig(tools=[cx_connector.tools]),
         )
 
         print("🤖 Agent response:", response)
-        history.append(response.candidates[0].content)
 
         while True:
             print("🤖 Waiting for function calls...")
             function_calls = []
+            function_content = []
             for candidate in response.candidates:
-                history.append(candidate.content)
+                function_content.append(candidate.content)
                 if candidate.content.parts:
                     for part in candidate.content.parts:
                         if hasattr(part, "function_call") and part.function_call:
@@ -62,15 +62,17 @@ class Agent:
                 tool_responses.append(function_response)
 
             print("🤖 Tool responses:", tool_responses)
-            history.append(Content(role="tool", parts=tool_responses))
 
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=history,
+                contents=[
+                    Content(role="user", parts=[Part.from_text(text=prompt)]),
+                    response.candidates[0].content,
+                    tool_responses
+                ],
                 config=GenerateContentConfig(tools=[cx_connector.tools]),
             )
-            print("🤖 Agent response after tool call:", response)
-            history.append(response.candidates[0].content)
+            # print("🤖 Agent response after tool call:", response)
 
     def __call__(self, prompt: str) -> str:
         return self.call_agent(prompt)

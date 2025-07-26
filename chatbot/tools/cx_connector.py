@@ -81,15 +81,20 @@ class CXConnector:
 
     def smc_analysis(self, symbol: str, timeframe="1h", limit=100):
         candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
+        current_price = candles[-1][4]
+
         booinger_bands = self.boolinger_bands(candles)
         sma = self.sma(candles)
         market_structure = self.calculate_market_structure(candles)
+        # rsi = self.rsi(candles)
 
         return {
             "result": {
+                "current_price": current_price,
                 "bollinger_bands": booinger_bands,
                 "sma": sma,
                 "market_structure": market_structure,
+                # "rsi": rsi,
             }
         }
 
@@ -131,11 +136,9 @@ class CXConnector:
                 structure = "CONSOLIDATION"
 
         return {
-            "result": {
-                "structure": structure,
-                "swingHighs": swing_highs,
-                "swingLows": swing_lows,
-            }
+            "structure": structure,
+            "swingHighs": swing_highs,
+            "swingLows": swing_lows,
         }
 
     def boolinger_bands(self, candles, period=20):
@@ -149,11 +152,9 @@ class CXConnector:
         df["lower_band"] = df["sma"] - (2 * df["std"])
 
         return {
-            "result": {
-                "upper_band": df["upper_band"].iloc[-1],
-                "lower_band": df["lower_band"].iloc[-1],
-                "sma": df["sma"].iloc[-1],
-            }
+            "upper_band": df["upper_band"].iloc[-1],
+            "lower_band": df["lower_band"].iloc[-1],
+            "sma": df["sma"].iloc[-1],
         }
 
     def sma(self, candles, period=20):
@@ -163,7 +164,20 @@ class CXConnector:
         )
         df["sma"] = df["close"].rolling(window=period).mean()
 
-        return {"result": df["sma"].iloc[-1]}
+        return df["sma"].iloc[-1]
+
+    def rsi(self, candles, period=14):
+        df = pd.DataFrame(
+            candles[-period:],
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+        delta = df["close"].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+
+        return rsi.iloc[-1]
 
     def save_trade_setup(
         self,
@@ -177,7 +191,6 @@ class CXConnector:
             string = f"Placing {order_type} order of {symbol} at price {entry}, stop loss at {stop_loss}, take profit at {take_profit}"
 
             print(string)
-            # asyncio.run(telegram_bot(string))
 
             return {"result": string}
         except Exception as e:
