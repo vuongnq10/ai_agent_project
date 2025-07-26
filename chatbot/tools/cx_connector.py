@@ -1,5 +1,3 @@
-import random
-
 import ccxt
 import pandas as pd
 from google.genai.types import Tool, FunctionDeclaration
@@ -12,8 +10,8 @@ class CXConnector:
         self.tools = Tool(
             function_declarations=[
                 FunctionDeclaration(
-                    name="calculate_market_structure",
-                    description="Calculate market structure based on recent OHLCV data.",
+                    name="smc_analysis",
+                    description="Perform Smart Money Concept analysis on the given symbol and timeframe.",
                     parameters={
                         "type": "object",
                         "properties": {
@@ -23,11 +21,52 @@ class CXConnector:
                             },
                             "timeframe": {
                                 "type": "string",
-                                "description": "The timeframe for the OHLCV data (e.g., '1h', '30m').",
+                                "description": "The timeframe for the analysis (e.g., '1h', '30m').",
                                 "default": "1h",
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Number of candles to fetch for analysis.",
+                                "default": 100,
                             },
                         },
                         "required": ["symbol", "timeframe"],
+                    },
+                ),
+                FunctionDeclaration(
+                    name="save_trade_setup",
+                    description="Save a trade setup with entry, stop loss, and take profit.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "symbol": {
+                                "type": "string",
+                                "description": "The trading pair symbol (e.g., 'SOL/USDT').",
+                            },
+                            "order_type": {
+                                "type": "string",
+                                "description": "Type of order (e.g., 'buy', 'sell').",
+                            },
+                            "entry": {
+                                "type": "number",
+                                "description": "Entry price for the trade.",
+                            },
+                            "stop_loss": {
+                                "type": "number",
+                                "description": "Stop loss price for the trade.",
+                            },
+                            "take_profit": {
+                                "type": "number",
+                                "description": "Take profit price for the trade.",
+                            },
+                        },
+                        "required": [
+                            "symbol",
+                            "order_type",
+                            "entry",
+                            "stop_loss",
+                            "take_profit",
+                        ],
                     },
                 ),
             ],
@@ -40,9 +79,21 @@ class CXConnector:
         print(f"📈 Fetched OHLCV data for {symbol} at {timeframe} timeframe: {ohlcv}")
         return {"result": ohlcv}
 
-    # def calculate_market_structure(self, candles: list):
-    def calculate_market_structure(self, symbol: str, timeframe="1h"):
-        candles = binance.fetch_ohlcv(symbol, timeframe, limit=100)
+    def smc_analysis(self, symbol: str, timeframe="1h", limit=100):
+        candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
+        booinger_bands = self.boolinger_bands(candles)
+        sma = self.sma(candles)
+        market_structure = self.calculate_market_structure(candles)
+
+        return {
+            "result": {
+                "bollinger_bands": booinger_bands,
+                "sma": sma,
+                "market_structure": market_structure,
+            }
+        }
+
+    def calculate_market_structure(self, candles):
         df = pd.DataFrame(
             candles,
             columns=["timestamp", "open", "high", "low", "close", "volume"],
@@ -86,3 +137,48 @@ class CXConnector:
                 "swingLows": swing_lows,
             }
         }
+
+    def boolinger_bands(self, candles, period=20):
+        df = pd.DataFrame(
+            candles[-period:],
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+        df["sma"] = df["close"].rolling(window=period).mean()
+        df["std"] = df["close"].rolling(window=period).std()
+        df["upper_band"] = df["sma"] + (2 * df["std"])
+        df["lower_band"] = df["sma"] - (2 * df["std"])
+
+        return {
+            "result": {
+                "upper_band": df["upper_band"].iloc[-1],
+                "lower_band": df["lower_band"].iloc[-1],
+                "sma": df["sma"].iloc[-1],
+            }
+        }
+
+    def sma(self, candles, period=20):
+        df = pd.DataFrame(
+            candles[-period:],
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+        df["sma"] = df["close"].rolling(window=period).mean()
+
+        return {"result": df["sma"].iloc[-1]}
+
+    def save_trade_setup(
+        self,
+        symbol: str,
+        order_type: str,
+        entry: float,
+        stop_loss: float,
+        take_profit: float,
+    ):
+        try:
+            string = f"Placing {order_type} order of {symbol} at price {entry}, stop loss at {stop_loss}, take profit at {take_profit}"
+
+            print(string)
+            # asyncio.run(telegram_bot(string))
+
+            return {"result": string}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
