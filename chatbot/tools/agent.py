@@ -1,12 +1,12 @@
 import os
 from google.genai import Client
 from google.genai.types import HttpOptions, GenerateContentConfig, Content, Part
-from chatbot.tools.calculator import Calculator
+from chatbot.tools.cx_connector import CXConnector
 
 GEMINI_MODEL = "gemini-2.0-flash-001"
 API_KEY = os.getenv("GOOGLE_API_KEY")
 
-calculator = Calculator()
+cx_connector = CXConnector()
 
 client = Client(api_key=API_KEY, http_options=HttpOptions(api_version="v1alpha"))
 
@@ -19,7 +19,7 @@ class Agent:
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=history,
-            config=GenerateContentConfig(tools=[calculator.tools]),
+            config=GenerateContentConfig(tools=[cx_connector.tools]),
         )
 
         print("🤖 Agent response:", response)
@@ -46,7 +46,7 @@ class Agent:
                 args = dict(func_call.args)
 
                 try:
-                    tool_func = getattr(calculator, tool_name)
+                    tool_func = getattr(cx_connector, tool_name)
                     tool_result = tool_func(**args)
                     function_response = Part.from_function_response(
                         name=tool_name,
@@ -67,7 +67,7 @@ class Agent:
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=history,
-                config=GenerateContentConfig(tools=[calculator.tools]),
+                config=GenerateContentConfig(tools=[cx_connector.tools]),
             )
             print("🤖 Agent response after tool call:", response)
             history.append(response.candidates[0].content)
