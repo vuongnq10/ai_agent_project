@@ -1,3 +1,5 @@
+# https://github.com/googleapis/python-genai
+
 import os
 from google.genai import Client
 from google.genai.types import HttpOptions, GenerateContentConfig, Content, Part
@@ -68,7 +70,7 @@ class Agent:
                 contents=[
                     Content(role="user", parts=[Part.from_text(text=prompt)]),
                     response.candidates[0].content,
-                    tool_responses
+                    tool_responses,
                 ],
                 config=GenerateContentConfig(tools=[cx_connector.tools]),
             )

@@ -2,24 +2,14 @@
 # 2. Langchain
 # 3. LLMs
 
+import asyncio
 from django.http import JsonResponse
-import os
 from chatbot.tools.agent import Agent
+from chatbot.telegram.telegram import telegram_bot
+from chatbot.binance_connector.binance import BinanceConnector
 
-# from chatbot.tools.cx_connector import CXConnector
-
-from google import genai
-from google.genai import types
-
-GEMINI_MODEL = "gemini-1.5-flash"
-API_KEY = os.getenv("GOOGLE_API_KEY")
 agent = Agent()
-# cx_conntector = CXConnector()
-
-
-client = genai.Client(
-    api_key=API_KEY, http_options=types.HttpOptions(api_version="v1alpha")
-)
+binance_connector = BinanceConnector()
 
 
 def chat(request):
@@ -48,3 +38,20 @@ def chat(request):
 #         )
 #     except Exception as e:
 #         return JsonResponse({"success": False, "error": str(e)})
+
+
+def telegram_notify(request):
+    message = request.GET.get("message", "No message provided")
+    more = request.GET.get("more", "")
+
+    try:
+        response = asyncio.run(telegram_bot(message, more))
+        return JsonResponse({"success": True, "response": response})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)})
+
+
+def test_binance(request):
+    params = binance_connector.get_balance()
+
+    return JsonResponse({"success": True, "data": params})
