@@ -16,7 +16,6 @@ client = Client(api_key=API_KEY, http_options=HttpOptions(api_version="v1alpha")
 class Agent:
 
     def call_agent(self, prompt: str) -> str:
-        # history = [Content(role="user", parts=[Part.from_text(text=prompt)])]
 
         response = client.models.generate_content(
             model=GEMINI_MODEL,
@@ -74,7 +73,6 @@ class Agent:
                 ],
                 config=GenerateContentConfig(tools=[cx_connector.tools]),
             )
-            # print("🤖 Agent response after tool call:", response)
 
     def __call__(self, prompt: str) -> str:
         return self.call_agent(prompt)

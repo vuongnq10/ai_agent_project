@@ -5,6 +5,6 @@ langchain
 langchain-google-genai
 google-genai
 ccxt
-fastmcp
 uvicorn
 pandas
+binance-sdk-derivatives-trading-usds-futures
