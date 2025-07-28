@@ -52,6 +52,6 @@ def telegram_notify(request):
 
 
 def test_binance(request):
-    params = binance_connector.get_balance()
+    params = binance_connector.positions
 
     return JsonResponse({"success": True, "data": params})

@@ -29,7 +29,7 @@ class BinanceConnector:
         self.positions = []
 
         self.client = DerivativesTradingUsdsFutures(config_rest_api=configuration)
-        # self.get_balance()
+        self.get_balance()
 
     def get_balance(self):
         response = self.client.rest_api.account_information_v3()
@@ -43,8 +43,6 @@ class BinanceConnector:
                 break
 
         self.positions = value.get("positions", [])
-
-        return {"assets": self.balance, "positions": self.positions}
 
     def create_orders(
         self,
@@ -64,12 +62,6 @@ class BinanceConnector:
                 "price": "60000.1",
             }
         ]
-        # order = self.client.new_batch_order()
-        return params
+        orders = self.client.rest_api.place_multiple_orders(params)
 
-    def fetch_ohlcv(self, symbol, timeframe, limit=100):
-        # candles = self.client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
-        return []
-
-    # def ticker_ohlcv(self, symbol, timeframe="1h", limit=100):
-    # binance = self.client
+        return orders.data().to_dict()
