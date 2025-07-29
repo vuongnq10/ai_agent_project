@@ -52,6 +52,6 @@ def telegram_notify(request):
 
 
 def test_binance(request):
-    params = binance_connector.positions
+    params = binance_connector.create_orders()
 
     return JsonResponse({"success": True, "data": params})

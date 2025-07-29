@@ -11,6 +11,9 @@ from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futur
 from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
     ExchangeInformationResponse,
 )
+from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
+    PlaceMultipleOrdersBatchOrdersParameterInner,
+)
 
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
@@ -46,22 +49,36 @@ class BinanceConnector:
 
     def create_orders(
         self,
-        symbol: str,
-        side: str,
-        order_type: str,
-        quantity: float,
-        price: float = None,
+        # symbol: str,
+        # side: str,
+        # order_type: str,
+        # quantity: float,
+        # price: float = None,
     ):
-        params = [
+        orders = [
             {
-                "symbol": "BTCUSD_PERP",
+                "symbol": "BTC/USDT",
                 "side": "BUY",
                 "type": "LIMIT",
-                "quantity": "0.001",
+                "price": 100000,
+                "quantity": 1,
                 "timeInForce": "GTC",
-                "price": "60000.1",
-            }
+            },
+            {
+                "symbol": "BTC/USDT",
+                "side": "SELL",
+                "type": "TAKE_PROFIT_MARKET",
+                "stopPrice": 120000,
+                "closePosition": "true",
+            },
+            {
+                "symbol": "BTC/USDT",
+                "side": "SELL",
+                "type": "STOP_MARKET",
+                "stopPrice": 90000,
+                "closePosition": "true",
+            },
         ]
-        orders = self.client.rest_api.place_multiple_orders(params)
+        orders = self.client.rest_api.place_multiple_orders(orders)
 
-        return orders.data().to_dict()
+        return orders.data()
