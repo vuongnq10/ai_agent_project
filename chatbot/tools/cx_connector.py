@@ -17,7 +17,7 @@ class CXConnector:
                         "properties": {
                             "symbol": {
                                 "type": "string",
-                                "description": "The trading pair symbol (e.g., 'SOL/USDT').",
+                                "description": "The trading pair symbol (e.g., 'SOLUSDT').",
                             },
                             "timeframe": {
                                 "type": "string",
@@ -41,23 +41,23 @@ class CXConnector:
                         "properties": {
                             "symbol": {
                                 "type": "string",
-                                "description": "The trading pair symbol (e.g., 'SOL/USDT').",
+                                "description": "The trading pair symbol (e.g., 'SOLUSDT').",
                             },
                             "order_type": {
                                 "type": "string",
                                 "description": "Type of order (e.g., 'buy', 'sell').",
                             },
                             "entry": {
-                                "type": "number",
-                                "description": "Entry price for the trade.",
+                                "type": "string",
+                                "description": "Entry price for the trade. String representation of a float.",
                             },
                             "stop_loss": {
-                                "type": "number",
-                                "description": "Stop loss price for the trade.",
+                                "type": "string",
+                                "description": "Stop loss price for the trade. String representation of a float.",
                             },
                             "take_profit": {
-                                "type": "number",
-                                "description": "Take profit price for the trade.",
+                                "type": "string",
+                                "description": "Take profit price for the trade. String representation of a float.",
                             },
                         },
                         "required": [
@@ -183,9 +183,9 @@ class CXConnector:
         self,
         symbol: str,
         order_type: str,
-        entry: float,
-        stop_loss: float,
-        take_profit: float,
+        entry: str,
+        stop_loss: str,
+        take_profit: str,
     ):
         try:
             string = f"Placing {order_type} order of {symbol} at price {entry}, stop loss at {stop_loss}, take profit at {take_profit}"

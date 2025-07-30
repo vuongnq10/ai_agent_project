@@ -52,33 +52,40 @@ class BinanceConnector:
         # symbol: str,
         # side: str,
         # order_type: str,
-        # quantity: float,
-        # price: float = None,
+        # quantity: str,
+        # price: str = None,
     ):
-        orders = [
-            {
-                "symbol": "BTC/USDT",
-                "side": "BUY",
-                "type": "LIMIT",
-                "price": 100000,
-                "quantity": 1,
-                "timeInForce": "GTC",
-            },
-            {
-                "symbol": "BTC/USDT",
-                "side": "SELL",
-                "type": "TAKE_PROFIT_MARKET",
-                "stopPrice": 120000,
-                "closePosition": "true",
-            },
-            {
-                "symbol": "BTC/USDT",
-                "side": "SELL",
-                "type": "STOP_MARKET",
-                "stopPrice": 90000,
-                "closePosition": "true",
-            },
-        ]
-        orders = self.client.rest_api.place_multiple_orders(orders)
+        try:
+            orders = [
+                {
+                    "symbol": "BTCUSDT",
+                    "side": "BUY",
+                    "type": "LIMIT",
+                    "price": "100000",
+                    "quantity": "1",
+                    "timeInForce": "GTC",
+                },
+                {
+                    "symbol": "BTCUSDT",
+                    "side": "SELL",
+                    "type": "TAKE_PROFIT_MARKET",
+                    "stopPrice": "120000",
+                    "closePosition": "true",
+                },
+                {
+                    "symbol": "BTCUSDT",
+                    "side": "SELL",
+                    "type": "STOP_MARKET",
+                    "stopPrice": "90000",
+                    "closePosition": "true",
+                },
+            ]
 
-        return orders.data()
+            response = self.client.rest_api.place_multiple_orders(orders)
+
+            data = response.data()
+
+            return [item.to_dict() for item in data]
+        except Exception as e:
+            print(f"Error creating orders: {e}")
+            return None
