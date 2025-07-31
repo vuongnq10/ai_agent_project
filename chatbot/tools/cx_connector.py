@@ -1,8 +1,10 @@
 import ccxt
 import pandas as pd
 from google.genai.types import Tool, FunctionDeclaration
+from chatbot.binance_connector.binance import BinanceConnector
 
 binance = ccxt.binance({})
+binance_connector = BinanceConnector()
 
 
 class CXConnector:
@@ -43,29 +45,29 @@ class CXConnector:
                                 "type": "string",
                                 "description": "The trading pair symbol (e.g., 'SOLUSDT').",
                             },
-                            "order_type": {
+                            "side": {
                                 "type": "string",
                                 "description": "Type of order (e.g., 'buy', 'sell').",
                             },
                             "entry": {
-                                "type": "string",
+                                "type": "number",
                                 "description": "Entry price for the trade. String representation of a float.",
                             },
-                            "stop_loss": {
-                                "type": "string",
-                                "description": "Stop loss price for the trade. String representation of a float.",
-                            },
-                            "take_profit": {
-                                "type": "string",
-                                "description": "Take profit price for the trade. String representation of a float.",
-                            },
+                            # "stop_loss": {
+                            #     "type": "string",
+                            #     "description": "Stop loss price for the trade. String representation of a float.",
+                            # },
+                            # "take_profit": {
+                            #     "type": "string",
+                            #     "description": "Take profit price for the trade. String representation of a float.",
+                            # },
                         },
                         "required": [
                             "symbol",
-                            "order_type",
+                            "side",
                             "entry",
-                            "stop_loss",
-                            "take_profit",
+                            # "stop_loss",
+                            # "take_profit",
                         ],
                     },
                 ),
@@ -182,16 +184,19 @@ class CXConnector:
     def save_trade_setup(
         self,
         symbol: str,
-        order_type: str,
-        entry: str,
-        stop_loss: str,
-        take_profit: str,
+        side: str,
+        entry: float,
+        # stop_loss: str,
+        # take_profit: str,
     ):
         try:
-            string = f"Placing {order_type} order of {symbol} at price {entry}, stop loss at {stop_loss}, take profit at {take_profit}"
+            response = binance_connector.create_orders(
+                symbol=symbol,
+                side=side,
+                # quantity="0.1",  # Example quantity, adjust as needed
+                price=entry,
+            )
 
-            print(string)
-
-            return {"result": string}
+            return {"result": response}
         except Exception as e:
             return {"status": "error", "message": str(e)}

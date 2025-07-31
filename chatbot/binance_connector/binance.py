@@ -25,6 +25,11 @@ configuration = ConfigurationRestAPI(
     base_path=BINANCE_BASE_URL,
 )
 
+LEVERAGE = 20
+ORDER_AMOUNT = 50
+EXPECTED_PROFIT = 0.35
+EXPECTED_STOP_LOSS = 0.35
+
 
 class BinanceConnector:
     def __init__(self):
@@ -49,34 +54,44 @@ class BinanceConnector:
 
     def create_orders(
         self,
-        # symbol: str,
-        # side: str,
-        # order_type: str,
+        symbol: str,
+        side: str,
+        price: float,
         # quantity: str,
-        # price: str = None,
     ):
         try:
+            quantity = ORDER_AMOUNT / price
+            profit_price = 0
+            stop_price = 0
+
+            if side == "BUY":
+                profit_price = price * (1 + EXPECTED_PROFIT / LEVERAGE)
+                stop_price = price * (1 - EXPECTED_PROFIT / LEVERAGE)
+            elif side == "SELL":
+                profit_price = price * (1 - EXPECTED_PROFIT / LEVERAGE)
+                stop_price = price * (1 + EXPECTED_PROFIT / LEVERAGE)
+
             orders = [
                 {
-                    "symbol": "BTCUSDT",
-                    "side": "BUY",
+                    "symbol": symbol,
+                    "side": side,
                     "type": "LIMIT",
-                    "price": "100000",
-                    "quantity": "1",
+                    "price": str(price),
+                    "quantity": str(quantity),
                     "timeInForce": "GTC",
                 },
                 {
-                    "symbol": "BTCUSDT",
-                    "side": "SELL",
+                    "symbol": symbol,
+                    "side": "BUY" if side == "SELL" else "SELL",
                     "type": "TAKE_PROFIT_MARKET",
-                    "stopPrice": "120000",
+                    "stopPrice": str(profit_price),
                     "closePosition": "true",
                 },
                 {
-                    "symbol": "BTCUSDT",
-                    "side": "SELL",
+                    "symbol": symbol,
+                    "side": "BUY" if side == "SELL" else "SELL",
                     "type": "STOP_MARKET",
-                    "stopPrice": "90000",
+                    "stopPrice": str(stop_price),
                     "closePosition": "true",
                 },
             ]
