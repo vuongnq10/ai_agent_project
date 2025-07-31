@@ -60,16 +60,16 @@ class BinanceConnector:
         # quantity: str,
     ):
         try:
-            quantity = ORDER_AMOUNT / price
-            profit_price = 0
-            stop_price = 0
+            quantity = float(ORDER_AMOUNT) / price
+            profit_price = 0.1
+            stop_price = 0.1
 
             if side == "BUY":
-                profit_price = price * (1 + EXPECTED_PROFIT / LEVERAGE)
-                stop_price = price * (1 - EXPECTED_PROFIT / LEVERAGE)
+                profit_price = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
+                stop_price = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
             elif side == "SELL":
-                profit_price = price * (1 - EXPECTED_PROFIT / LEVERAGE)
-                stop_price = price * (1 + EXPECTED_PROFIT / LEVERAGE)
+                profit_price = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
+                stop_price = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
 
             orders = [
                 {
@@ -95,6 +95,8 @@ class BinanceConnector:
                     "closePosition": "true",
                 },
             ]
+
+            print(f"Creating orders: {orders}")
 
             response = self.client.rest_api.place_multiple_orders(orders)
 

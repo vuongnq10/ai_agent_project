@@ -47,11 +47,11 @@ class CXConnector:
                             },
                             "side": {
                                 "type": "string",
-                                "description": "Type of order (e.g., 'buy', 'sell').",
+                                "description": "Type of order (e.g., 'BUY', 'SELL').",
                             },
                             "entry": {
                                 "type": "number",
-                                "description": "Entry price for the trade. String representation of a float.",
+                                "description": "Entry price for the trade. ",
                             },
                             # "stop_loss": {
                             #     "type": "string",
@@ -193,7 +193,6 @@ class CXConnector:
             response = binance_connector.create_orders(
                 symbol=symbol,
                 side=side,
-                # quantity="0.1",  # Example quantity, adjust as needed
                 price=entry,
             )
 

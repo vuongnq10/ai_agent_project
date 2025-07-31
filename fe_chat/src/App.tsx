@@ -22,7 +22,7 @@ function App() {
   }, [chatHistory]);
 
   const handleCoinClick = (coin: string) => {
-    const query = `get indicator of ${coin} in 30m, 1h, 2h and 4h, analyze to get entry price, stop loss, take profit and order type then save the trade setup`;
+    const query = `get indicator of ${coin} in 30m, 1h, 2h and 4h, analyze to get entry price, side of buy or sell then save the trade setup`;
     setMessage(query);
     handleSubmit({ preventDefault: () => {} } as React.FormEvent, query); // Pass a dummy event and the query
   };
