@@ -2,6 +2,9 @@
 # https://github.com/binance/binance-connector-python/tree/master/clients/derivatives_trading_usds_futures
 # https://github.com/binance/binance-connector-python/blob/master/clients/derivatives_trading_usds_futures/src/binance_sdk_derivatives_trading_usds_futures/rest_api/rest_api.py
 import os
+import asyncio
+
+from chatbot.telegram.telegram import telegram_bot
 
 from binance_common.configuration import ConfigurationRestAPI
 from binance_common.constants import DERIVATIVES_TRADING_USDS_FUTURES_REST_API_PROD_URL
@@ -52,6 +55,10 @@ class BinanceConnector:
 
         self.positions = value.get("positions", [])
 
+    def match_precision(self, value, reference_str):
+        decimals = len(reference_str.split(".")[1]) if "." in reference_str else 0
+        return round(value, decimals)
+
     def create_orders(
         self,
         symbol: str,
@@ -60,23 +67,45 @@ class BinanceConnector:
         # quantity: str,
     ):
         try:
-            quantity = float(ORDER_AMOUNT) / price
+            symbol_config = self.get_exchange_info(symbol)
+            filter = symbol_config.get("filters", [])
+            price_filter = next(
+                (item for item in filter if item["filterType"] == "PRICE_FILTER"), None
+            )
+            lot_size_filter = next(
+                (item for item in filter if item["filterType"] == "LOT_SIZE"), None
+            )
+
+            quantity = self.match_precision(
+                float(ORDER_AMOUNT) / price, lot_size_filter["stepSize"]
+            )
+            real_price = self.match_precision(price, price_filter["tickSize"])
             profit_price = 0.1
             stop_price = 0.1
 
             if side == "BUY":
-                profit_price = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
-                stop_price = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_profit = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_stop = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
+
+                profit_price = self.match_precision(
+                    temp_profit, price_filter["tickSize"]
+                )
+                stop_price = self.match_precision(temp_stop, price_filter["tickSize"])
             elif side == "SELL":
-                profit_price = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
-                stop_price = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_profit = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_stop = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
+
+                profit_price = self.match_precision(
+                    temp_profit, price_filter["tickSize"]
+                )
+                stop_price = self.match_precision(temp_stop, price_filter["tickSize"])
 
             orders = [
                 {
                     "symbol": symbol,
                     "side": side,
                     "type": "LIMIT",
-                    "price": str(price),
+                    "price": str(real_price),
                     "quantity": str(quantity),
                     "timeInForce": "GTC",
                 },
@@ -104,5 +133,25 @@ class BinanceConnector:
 
             return [item.to_dict() for item in data]
         except Exception as e:
+            asyncio.run(
+                telegram_bot(
+                    f"""
+                    Error creating orders for {symbol} with side {side} and price {price}:
+                    {str(e)}
+                """
+                )
+            )
             print(f"Error creating orders: {e}")
             return None
+
+    def get_exchange_info(self, symbol: str = None):
+        # symbol = "BNBUSDT"
+
+        response = self.client.rest_api.exchange_information()
+        data = response.data().to_dict()
+
+        symbols = data.get("symbols", [])
+
+        obj_symbols = next((item for item in symbols if item["symbol"] == symbol), None)
+
+        return obj_symbols

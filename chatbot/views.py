@@ -52,8 +52,11 @@ def telegram_notify(request):
 
 
 def test_binance(request):
-    params = binance_connector.create_orders(
-        symbol="SOLUSDT", side="BUY", quantity="0.1", price="20.0"
-    )
+    # params = binance_connector.create_orders(
+    #     symbol="SOLUSDT", side="BUY", quantity="0.1", price="20.0"
+    # )
+    # message = request.GET.get("coin")
+    # params = binance_connector.get_exchange_info(symbol=message)
+    params = binance_connector.create_orders("BNBUSDT", "BUY", 0.3140)
 
     return JsonResponse({"success": True, "data": params})
