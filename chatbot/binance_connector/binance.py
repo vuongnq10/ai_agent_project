@@ -56,8 +56,8 @@ class BinanceConnector:
         self,
         symbol: str,
         side: str,
-        price: float,
-        # quantity: str,
+        order_price: float,
+        current_price: float,
     ):
         try:
             symbol_config = self.get_exchange_info(symbol)
@@ -70,23 +70,27 @@ class BinanceConnector:
             )
 
             quantity = self.match_precision(
-                float(ORDER_AMOUNT) / price, lot_size_filter["stepSize"]
+                float(ORDER_AMOUNT) / order_price, lot_size_filter["stepSize"]
             )
-            real_price = self.match_precision(price, price_filter["tickSize"])
+            real_price = self.match_precision(order_price, price_filter["tickSize"])
             profit_price = 0.1
             stop_price = 0.1
 
             if side == "BUY":
-                temp_profit = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
-                temp_stop = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_profit = order_price * (
+                    1 + float(EXPECTED_PROFIT) / float(LEVERAGE)
+                )
+                temp_stop = order_price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
 
                 profit_price = self.match_precision(
                     temp_profit, price_filter["tickSize"]
                 )
                 stop_price = self.match_precision(temp_stop, price_filter["tickSize"])
             elif side == "SELL":
-                temp_profit = price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
-                temp_stop = price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_profit = order_price * (
+                    1 - float(EXPECTED_PROFIT) / float(LEVERAGE)
+                )
+                temp_stop = order_price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
 
                 profit_price = self.match_precision(
                     temp_profit, price_filter["tickSize"]
@@ -128,8 +132,9 @@ class BinanceConnector:
             asyncio.run(
                 telegram_bot(
                     f"""
-                        Create an order for {symbol} with side {side} and price {price}:
+                        Create an order for {symbol} with side {side} and price {order_price}:
                         Order type: {"BUY" if side == "SELL" else "SELL"}
+                        Current Price: ${current_price}
                         Price: ${real_price}
                         Quantity: {quantity}
                         Profit Price: ${profit_price}
@@ -143,7 +148,7 @@ class BinanceConnector:
             asyncio.run(
                 telegram_bot(
                     f"""
-                    Error creating orders for {symbol} with side {side} and price {price}:
+                    Error creating orders for {symbol} with side {side} and price {order_price}:
                     {str(e)}
                 """
                 )

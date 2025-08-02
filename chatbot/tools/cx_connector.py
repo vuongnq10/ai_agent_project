@@ -1,6 +1,7 @@
 import ccxt
 import pandas as pd
 from google.genai.types import Tool, FunctionDeclaration
+
 from chatbot.binance_connector.binance import BinanceConnector
 
 binance = ccxt.binance({})
@@ -83,7 +84,7 @@ class CXConnector:
 
     def smc_analysis(self, symbol: str, timeframe="1h", limit=100):
         candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
-        current_price = candles[-1][4]
+        self.current_price = candles[-1][4]
 
         booinger_bands = self.bollinger_bands(candles)
         sma = self.sma(candles)
@@ -92,7 +93,6 @@ class CXConnector:
 
         return {
             "result": {
-                "current_price": current_price,
                 "bollinger_bands": booinger_bands,
                 "sma": sma,
                 "market_structure": market_structure,
@@ -190,14 +190,13 @@ class CXConnector:
         symbol: str,
         side: str,
         entry: float,
-        # stop_loss: str,
-        # take_profit: str,
     ):
         try:
             response = binance_connector.create_orders(
                 symbol=symbol,
                 side=side,
                 price=entry,
+                current_price=self.current_price,
             )
 
             return {"result": response}
