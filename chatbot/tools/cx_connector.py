@@ -85,10 +85,10 @@ class CXConnector:
         candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
         current_price = candles[-1][4]
 
-        booinger_bands = self.boolinger_bands(candles)
+        booinger_bands = self.bollinger_bands(candles)
         sma = self.sma(candles)
         market_structure = self.calculate_market_structure(candles)
-        # rsi = self.rsi(candles)
+        rsi = self.rsi(candles)
 
         return {
             "result": {
@@ -96,7 +96,7 @@ class CXConnector:
                 "bollinger_bands": booinger_bands,
                 "sma": sma,
                 "market_structure": market_structure,
-                # "rsi": rsi,
+                "rsi": rsi,
             }
         }
 
@@ -143,39 +143,43 @@ class CXConnector:
             "swingLows": swing_lows,
         }
 
-    def boolinger_bands(self, candles, period=20):
-        df = pd.DataFrame(
+    def bollinger_bands(self, candles, period=20, multiplier=2):
+        data_frame = pd.DataFrame(
             candles[-period:],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
         )
-        df["sma"] = df["close"].rolling(window=period).mean()
-        df["std"] = df["close"].rolling(window=period).std()
-        df["upper_band"] = df["sma"] + (2 * df["std"])
-        df["lower_band"] = df["sma"] - (2 * df["std"])
+
+        data_frame["sma"] = data_frame["close"].rolling(window=period).mean()
+        data_frame["std"] = data_frame["close"].rolling(window=period).std()
+
+        data_frame["upper_band"] = data_frame["sma"] + (multiplier * data_frame["std"])
+        data_frame["lower_band"] = data_frame["sma"] - (multiplier * data_frame["std"])
 
         return {
-            "upper_band": df["upper_band"].iloc[-1],
-            "lower_band": df["lower_band"].iloc[-1],
-            "sma": df["sma"].iloc[-1],
+            "upper_band": data_frame["upper_band"].iloc[-1],
+            "lower_band": data_frame["lower_band"].iloc[-1],
+            "sma": data_frame["sma"].iloc[-1],
         }
 
     def sma(self, candles, period=20):
-        df = pd.DataFrame(
+        data_framge = pd.DataFrame(
             candles[-period:],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
         )
-        df["sma"] = df["close"].rolling(window=period).mean()
+        data_framge["sma"] = data_framge["close"].rolling(window=period).mean()
 
-        return df["sma"].iloc[-1]
+        return data_framge["sma"].iloc[-1]
 
     def rsi(self, candles, period=14):
-        df = pd.DataFrame(
+        data_frame = pd.DataFrame(
             candles[-period:],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
         )
-        delta = df["close"].diff()
+
+        delta = data_frame["close"].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
 
