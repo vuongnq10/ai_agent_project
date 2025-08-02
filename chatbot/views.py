@@ -42,7 +42,30 @@ def chat(request):
 
 def telegram_notify(request):
     message = request.GET.get("message", "No message provided")
-    more = request.GET.get("more", "")
+    more = [
+        {
+            "symbol": "SUIUSDT",
+            "side": "SELL",
+            "type": "LIMIT",
+            "price": "3.4684",
+            "quantity": "14.4",
+            "timeInForce": "GTC",
+        },
+        {
+            "symbol": "SUIUSDT",
+            "side": "BUY",
+            "type": "TAKE_PROFIT_MARKET",
+            "stopPrice": "3.347006",
+            "closePosition": "true",
+        },
+        {
+            "symbol": "SUIUSDT",
+            "side": "BUY",
+            "type": "STOP_MARKET",
+            "stopPrice": "3.589794",
+            "closePosition": "true",
+        },
+    ]
 
     try:
         response = asyncio.run(telegram_bot(message, more))

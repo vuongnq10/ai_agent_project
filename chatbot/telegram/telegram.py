@@ -1,6 +1,7 @@
 import os
 import aiohttp
 from datetime import datetime
+import json
 
 token = os.getenv("TELEGRAM_TOKEN")
 chat_id = os.getenv("TELEGRAM_CHATID")
@@ -13,10 +14,10 @@ async def telegram_bot(message: str, more=None):
         payload = {
             "chat_id": chat_id,
             "text": f"""
-                  {env}: {message}
-                  {more or ''}
-                  at: {datetime.now().strftime('%m/%d/%Y, %I:%M:%S %p')}
-                  """,
+                {env}: {message}
+                {json.dumps(more, indent=4) if more else ''}
+                at: {datetime.now().strftime('%m/%d/%Y, %I:%M:%S %p')}
+                """,
             "parse_mode": "HTML",
         }
 

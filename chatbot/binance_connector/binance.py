@@ -7,15 +7,8 @@ import asyncio
 from chatbot.telegram.telegram import telegram_bot
 
 from binance_common.configuration import ConfigurationRestAPI
-from binance_common.constants import DERIVATIVES_TRADING_USDS_FUTURES_REST_API_PROD_URL
 from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futures import (
     DerivativesTradingUsdsFutures,
-)
-from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
-    ExchangeInformationResponse,
-)
-from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
-    PlaceMultipleOrdersBatchOrdersParameterInner,
 )
 
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
@@ -30,8 +23,8 @@ configuration = ConfigurationRestAPI(
 
 LEVERAGE = 20
 ORDER_AMOUNT = 50
-EXPECTED_PROFIT = 0.35
-EXPECTED_STOP_LOSS = 0.35
+EXPECTED_PROFIT = 2
+EXPECTED_STOP_LOSS = 2
 
 
 class BinanceConnector:
@@ -130,8 +123,22 @@ class BinanceConnector:
             response = self.client.rest_api.place_multiple_orders(orders)
 
             data = response.data()
+            result = [item.to_dict() for item in data]
 
-            return [item.to_dict() for item in data]
+            asyncio.run(
+                telegram_bot(
+                    f"""
+                        Create an order for {symbol} with side {side} and price {price}:
+                        Order type: {"BUY" if side == "SELL" else "SELL"}
+                        Price: ${real_price}
+                        Quantity: {quantity}
+                        Profit Price: ${profit_price}
+                        Stop Price: ${stop_price}
+                    """,
+                )
+            )
+
+            return result
         except Exception as e:
             asyncio.run(
                 telegram_bot(
