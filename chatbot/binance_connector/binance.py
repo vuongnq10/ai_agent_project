@@ -135,7 +135,7 @@ class BinanceConnector:
                         Create an order for {symbol} with side {side} and price {order_price}:
                         Order type: {"BUY" if side == "SELL" else "SELL"}
                         Current Price: ${current_price}
-                        Price: ${real_price}
+                        Order Price: ${real_price}
                         Quantity: {quantity}
                         Profit Price: ${profit_price}
                         Stop Price: ${stop_price}

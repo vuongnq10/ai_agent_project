@@ -1,7 +1,9 @@
 import ccxt
 import pandas as pd
 from google.genai.types import Tool, FunctionDeclaration
+import asyncio
 
+from chatbot.telegram.telegram import telegram_bot
 from chatbot.binance_connector.binance import BinanceConnector
 
 binance = ccxt.binance({})
@@ -38,7 +40,7 @@ class CXConnector:
                 ),
                 FunctionDeclaration(
                     name="save_trade_setup",
-                    description="Save a trade setup with entry, stop loss, and take profit.",
+                    description="Save a 20 leverage trade setup with entry, stop loss, and take profit.",
                     parameters={
                         "type": "object",
                         "properties": {
@@ -89,16 +91,65 @@ class CXConnector:
         booinger_bands = self.bollinger_bands(candles)
         sma = self.sma(candles)
         market_structure = self.calculate_market_structure(candles)
+        liquidity_pools = self.liquidity_pools(candles)
+        order_blocks = self.order_blocks(candles)
         rsi = self.rsi(candles)
+        levels = self.trade_levels(
+            self.current_price, candles, market_structure["structure"]
+        )
+        # asyncio.run(
+        #     telegram_bot(
+        #         f""" 
+        #         Trade Levels {symbol}:
+        #         Entry: {levels['entry']}
+        #         Stop Loss: {levels['stopLoss']}
+        #         Take Profit: {levels['takeProfit']}
+        #         Trend: {market_structure["structure"]}
+        #         """
+        #     )
+        # )
 
         return {
             "result": {
+                "current_price": self.current_price,
                 "bollinger_bands": booinger_bands,
                 "sma": sma,
                 "market_structure": market_structure,
                 "rsi": rsi,
+                "liquidity_pools": liquidity_pools,
+                "order_blocks": order_blocks,
+                "levels": levels,
             }
         }
+
+    def calculate_atr(self, candles):
+        df = pd.DataFrame(
+            candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
+        tr_values = []
+        for i in range(len(df) - 1):
+            high = df["high"].iloc[i]
+            low = df["low"].iloc[i]
+            prev_close = df["close"].iloc[i + 1]
+            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+            tr_values.append(tr)
+        return sum(tr_values) / len(tr_values) if tr_values else 0
+
+    def trade_levels(self, current_price, candles, trend):
+        atr = self.calculate_atr(candles)
+
+        if trend.startswith("BULLISH"):
+            # Long setup
+            entry = current_price
+            stop_loss = current_price - atr
+            take_profit = current_price + (2 * atr)
+        elif trend.startswith("BEARISH"):
+            # Short setup
+            entry = current_price
+            stop_loss = current_price + atr
+            take_profit = current_price - (2 * atr)
+
+        return {"entry": entry, "stopLoss": stop_loss, "takeProfit": take_profit}
 
     def calculate_market_structure(self, candles):
         df = pd.DataFrame(
@@ -185,6 +236,86 @@ class CXConnector:
 
         return rsi.iloc[-1]
 
+    def liquidity_pools(self, candles):
+        df = pd.DataFrame(
+            candles,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+        avg_volume = df["volume"].mean()
+        high_volume_threshold = avg_volume * 1.5
+        pools = []
+
+        for i in range(1, len(df) - 1):
+            if df["volume"].iloc[i] > high_volume_threshold:
+                if (
+                    df["low"].iloc[i] < df["low"].iloc[i - 1]
+                    and df["low"].iloc[i] < df["low"].iloc[i + 1]
+                ):
+                    pools.append(
+                        {
+                            "type": "DEMAND",
+                            "price": df["low"].iloc[i],
+                            "volume": df["volume"].iloc[i],
+                            "strength": df["volume"].iloc[i] / avg_volume,
+                        }
+                    )
+                elif (
+                    df["high"].iloc[i] > df["high"].iloc[i - 1]
+                    and df["high"].iloc[i] > df["high"].iloc[i + 1]
+                ):
+                    pools.append(
+                        {
+                            "type": "SUPPLY",
+                            "price": df["high"].iloc[i],
+                            "volume": df["volume"].iloc[i],
+                            "strength": df["volume"].iloc[i] / avg_volume,
+                        }
+                    )
+
+        return sorted(pools, key=lambda x: x["strength"], reverse=True)[:3]
+
+    def order_blocks(self, candles):
+        df = pd.DataFrame(
+            candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
+        avg_volume = df["volume"].mean()
+        order_blocks = []
+
+        for i in range(1, len(df) - 1):
+            current_candle = df.iloc[i]
+            next_candle = df.iloc[i - 1]
+            if current_candle["volume"] > avg_volume * 1.5:
+                price_change = (
+                    (next_candle["close"] - current_candle["close"])
+                    / current_candle["close"]
+                ) * 100
+                if (
+                    price_change > 1.0
+                    and current_candle["close"] > current_candle["open"]
+                ):
+                    order_blocks.append(
+                        {
+                            "type": "BULLISH",
+                            "price": current_candle["close"],
+                            "volume": current_candle["volume"],
+                            "strength": abs(price_change),
+                        }
+                    )
+                elif (
+                    price_change < -1.0
+                    and current_candle["close"] < current_candle["open"]
+                ):
+                    order_blocks.append(
+                        {
+                            "type": "BEARISH",
+                            "price": current_candle["close"],
+                            "volume": current_candle["volume"],
+                            "strength": abs(price_change),
+                        }
+                    )
+
+        return sorted(order_blocks, key=lambda x: x["strength"], reverse=True)[:3]
+
     def save_trade_setup(
         self,
         symbol: str,
@@ -195,7 +326,7 @@ class CXConnector:
             response = binance_connector.create_orders(
                 symbol=symbol,
                 side=side,
-                price=entry,
+                order_price=entry,
                 current_price=self.current_price,
             )
 

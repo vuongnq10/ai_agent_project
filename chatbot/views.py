@@ -58,8 +58,8 @@ def telegram_notify(request):
 
 
 def test_binance(request):
-    # params = binance_connector.create_orders("BNBUSDT", "BUY", 0.3140)
-    ticker = cx_connector.get_ticker("BNBUSDT")
-    bollinger_bands = cx_connector.bollinger_bands(ticker["result"])
+    coin = request.GET.get("coin", "No coin provided")
+    ticker = cx_connector.smc_analysis(coin, "1h")
+    # bollinger_bands = cx_connector.bollinger_bands(ticker["result"])
 
-    return JsonResponse({"success": True, "data": bollinger_bands})
+    return JsonResponse({"success": True, "data": ticker})
