@@ -190,8 +190,8 @@ class CXConnector:
 
         return {
             "structure": structure,
-            "swingHighs": swing_highs,
-            "swingLows": swing_lows,
+            "swing_highs": swing_highs,
+            "swing_lows": swing_lows,
         }
 
     def bollinger_bands(self, candles, period=20, multiplier=2):

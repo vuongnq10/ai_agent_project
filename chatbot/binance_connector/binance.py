@@ -133,7 +133,7 @@ class BinanceConnector:
                 telegram_bot(
                     f"""
                         Create an order for {symbol} with side {side} and price {order_price}:
-                        Order type: {"BUY" if side == "SELL" else "SELL"}
+                        Order type: {side}
                         Current Price: ${current_price}
                         Order Price: ${real_price}
                         Quantity: {quantity}

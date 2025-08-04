@@ -1,6 +1,7 @@
 # 1. N8N
 # 2. Langchain
 # 3. LLMs
+# 4. LangGraph
 
 import asyncio
 from django.http import JsonResponse
