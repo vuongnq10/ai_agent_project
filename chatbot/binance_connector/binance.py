@@ -18,13 +18,18 @@ BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
     api_secret=BINANCE_SECRET_KEY,
-    base_path=BINANCE_BASE_URL,
+    # base_path=BINANCE_BASE_URL,
 )
 
+# LEVERAGE = 20
+# ORDER_AMOUNT = 50
+# EXPECTED_PROFIT = 2
+# EXPECTED_STOP_LOSS = 2
+
 LEVERAGE = 20
-ORDER_AMOUNT = 50
-EXPECTED_PROFIT = 2
-EXPECTED_STOP_LOSS = 2
+ORDER_AMOUNT = 25
+EXPECTED_PROFIT = 0.5
+EXPECTED_STOP_LOSS = 0.5
 
 
 class BinanceConnector:
@@ -36,6 +41,7 @@ class BinanceConnector:
         self.get_balance()
 
     def get_balance(self):
+
         response = self.client.rest_api.account_information_v3()
 
         value = response.data().to_dict()
@@ -45,6 +51,8 @@ class BinanceConnector:
             if asset.get("asset") == "USDT":
                 self.balance = float(asset.get("walletBalance", 0))
                 break
+
+        print("Wallet Balance:", self.balance)
 
         self.positions = value.get("positions", [])
 
@@ -70,7 +78,8 @@ class BinanceConnector:
             )
 
             quantity = self.match_precision(
-                float(ORDER_AMOUNT) / order_price, lot_size_filter["stepSize"]
+                (float(ORDER_AMOUNT) * LEVERAGE) / order_price,
+                lot_size_filter["stepSize"],
             )
             real_price = self.match_precision(order_price, price_filter["tickSize"])
             profit_price = 0.1
