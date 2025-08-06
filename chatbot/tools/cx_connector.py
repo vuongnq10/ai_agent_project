@@ -1,9 +1,7 @@
 import ccxt
 import pandas as pd
 from google.genai.types import Tool, FunctionDeclaration
-import asyncio
 
-from chatbot.telegram.telegram import telegram_bot
 from chatbot.binance_connector.binance import BinanceConnector
 
 binance = ccxt.binance({})
