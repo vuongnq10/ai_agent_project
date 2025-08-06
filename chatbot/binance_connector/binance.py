@@ -18,7 +18,7 @@ BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
     api_secret=BINANCE_SECRET_KEY,
-    # base_path=BINANCE_BASE_URL,
+    base_path=BINANCE_BASE_URL,
 )
 
 # LEVERAGE = 20
@@ -28,8 +28,8 @@ configuration = ConfigurationRestAPI(
 
 LEVERAGE = 20
 ORDER_AMOUNT = 25
-EXPECTED_PROFIT = 0.5
-EXPECTED_STOP_LOSS = 0.5
+EXPECTED_PROFIT = 0.25
+EXPECTED_STOP_LOSS = 0.25
 
 
 class BinanceConnector:
@@ -166,7 +166,6 @@ class BinanceConnector:
             return None
 
     def get_exchange_info(self, symbol: str = None):
-        # symbol = "BNBUSDT"
 
         response = self.client.rest_api.exchange_information()
         data = response.data().to_dict()
