@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     user_prompt: str
     final_response: str
     iteration_count: int
+    max_iterations: int
 
 
 class LangGraphAgent:
@@ -60,19 +61,43 @@ class LangGraphAgent:
 
     def _generate_response(self, state: AgentState) -> AgentState:
         """Generate response from Gemini model"""
+        print("#" * 50)
         print("🤖 Generating response from Gemini...")
 
         # Build content for the request
         if state["iteration_count"] == 0:
-            # First iteration - just the user prompt
+            # First iteration - user prompt with clear instructions
+            system_message = """You are a helpful assistant with access to calculation tools. You must complete ALL parts of the user's request step by step using the available tools.
+
+IMPORTANT: When a user asks for multiple operations (like "get 2 random numbers then find their sum"):
+1. You must perform ALL requested operations 
+2. Use function calls for each step
+3. Continue calling tools until the complete task is finished
+4. Only provide a final text response when ALL operations are complete
+
+For the current request, analyze what needs to be done and execute ALL steps."""
+
             contents = [
-                Content(role="user", parts=[Part.from_text(text=state["user_prompt"])])
+                Content(
+                    role="user",
+                    parts=[
+                        Part.from_text(
+                            text=f"{system_message}\n\nUser request: {state['user_prompt']}\n\nNow execute all necessary steps to complete this request."
+                        )
+                    ],
+                )
             ]
         else:
-            # Subsequent iterations - include previous messages
+            # Subsequent iterations - include all previous messages plus a reminder
             contents = []
             for msg in state["messages"]:
                 contents.append(msg)
+
+            # Add a specific reminder based on the original task
+            reminder_text = f"Continue with the original task: '{state['user_prompt']}'. You have executed some steps but the task is not complete yet. Think about what operations are still needed and continue using tools to finish ALL required operations. Do not repeat operations you have already completed."
+            contents.append(
+                Content(role="user", parts=[Part.from_text(text=reminder_text)])
+            )
 
         response = client.models.generate_content(
             model=GEMINI_MODEL,
@@ -97,6 +122,13 @@ class LangGraphAgent:
     ) -> Literal["execute_tools", "finalize"]:
         """Determine if we need to execute tools or finalize"""
         if not state["messages"]:
+            return "finalize"
+
+        # Check for maximum iterations to prevent infinite loops
+        if state["iteration_count"] >= state["max_iterations"]:
+            print(
+                f"🛑 Maximum iterations ({state['max_iterations']}) reached, finalizing..."
+            )
             return "finalize"
 
         last_message = state["messages"][-1]
@@ -176,7 +208,7 @@ class LangGraphAgent:
         state["final_response"] = "No response generated"
         return state
 
-    def call_agent(self, prompt: str) -> str:
+    def call_agent(self, prompt: str, max_iterations: int = 10) -> str:
         """Main entry point for the agent"""
         print(f"🚀 Starting LangGraph agent with prompt: {prompt}")
 
@@ -186,6 +218,7 @@ class LangGraphAgent:
             "user_prompt": prompt,
             "final_response": "",
             "iteration_count": 0,
+            "max_iterations": max_iterations,
         }
 
         # Run the graph

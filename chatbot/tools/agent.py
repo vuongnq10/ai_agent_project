@@ -25,6 +25,7 @@ class AgentState(TypedDict):
     user_prompt: str
     final_response: str
     iteration_count: int
+    max_iterations: int
 
 
 class Agent:
@@ -54,19 +55,34 @@ class Agent:
         return workflow.compile()
 
     def _generate_response(self, state: AgentState):
+        print("#" * 50)
+
         if state["iteration_count"] == 0:
+            system_message = f"""
+            You are a helpful cryptocurrency trading assistant with access to calculation tools. You must complete ALL parts of the user's request step by step using the available tools.
+            \n\n User request: {state["user_prompt"]}
+            """
             contents = [
-                Content(role="user", parts=[Part.from_text(text=state["user_prompt"])])
+                Content(role="user", parts=[Part.from_text(text=system_message)])
             ]
         else:
             contents = []
             for message in state["messages"]:
                 contents.append(message)
 
+            reminder_text = f"Continue with the original task: '{state['user_prompt']}'. You have executed some steps but the task is not complete yet. Think about what operations are still needed and continue using tools to finish ALL required operations. Do not repeat operations you have already completed."
+            contents.append(
+                Content(role="user", parts=[Part.from_text(text=reminder_text)])
+            )
+
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=contents,
             config=GenerateContentConfig(tools=[self.cx_connector.tools]),
+        )
+
+        print(
+            f"🤖 Agent response (iteration {state['iteration_count'] + 1}):", response
         )
 
         if response.candidates:
@@ -83,6 +99,12 @@ class Agent:
         if not state["messages"]:
             return "finalize"
 
+        if state["iteration_count"] >= state["max_iterations"]:
+            print(
+                f"🛑 Maximum iterations ({state['max_iterations']}) reached, finalizing..."
+            )
+            return "finalize"
+
         last_message = state["messages"][-1]
 
         if hasattr(last_message, "parts") and last_message.parts:
@@ -90,7 +112,7 @@ class Agent:
                 if hasattr(part, "function_call") and part.function_call:
                     return "execute_tools"
 
-        return 'finalize'
+        return "finalize"
 
     def _execute_tools(self, state: AgentState):
         if not state["messages"]:
@@ -139,12 +161,13 @@ class Agent:
         state["final_response"] = "No response generated."
         return state
 
-    def call_agent(self, prompt):
+    def call_agent(self, prompt, max_iterations=20):
         initial_state: AgentState = {
             "messages": [],
             "user_prompt": prompt,
             "final_response": "",
             "iteration_count": 0,
+            "max_iterations": max_iterations,
         }
 
         final_state = self.graph.invoke(initial_state)
