@@ -23,15 +23,39 @@ def chat(request):
 
     def event_stream():
         try:
-            for chunk in agent(user_message):
-                if chunk:  # Only yield non-empty chunks
-                    yield f"data: {chunk}\n\n"
+            # Use the streaming method from the agent
+            for chunk in agent.call_agent_simple_stream(user_message):
+                yield f"data: {chunk}\n\n"
+            # Signal end of stream
+            yield f"data: [DONE]\n\n"
         except Exception as e:
-            print(f"Error in streaming: {e}")
+            print(f"Error in streaming: {str(e)}")
             yield f"data: Error: {str(e)}\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
+
+def chat_with_tools_stream(request):
+    """
+    Streaming chat endpoint that supports tool calling and complex agent workflows
+    """
+    user_message = request.GET.get("query")
+    max_iterations = int(request.GET.get("max_iterations", 20))
+
+    print("User message (with tools):", user_message)
+
+    def event_stream():
+        try:
+            # Use the full agent streaming with tools support
+            for chunk in agent.call_agent_stream(user_message, max_iterations=max_iterations):
+                yield f"data: {chunk}\n\n"
+            # Signal end of stream
+            yield f"data: [DONE]\n\n"
+        except Exception as e:
+            print(f"Error in tools streaming: {str(e)}")
+            yield f"data: Error: {str(e)}\n\n"
+
+    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
 def chat_stream(request):
     user_message = request.GET.get("query")
@@ -39,7 +63,7 @@ def chat_stream(request):
     def event_stream():
         for char in user_message:
             yield f"data: {char}\n\n"
-            time.sleep(0.005)  # Delay for 300ms
+            time.sleep(0.005) # Delay for 300ms
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
