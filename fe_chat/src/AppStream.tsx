@@ -221,31 +221,6 @@ function App() {
                 </div>
               ))
             )}
-            {loading && (
-              <div className="message-wrapper assistant">
-                <div className="message-avatar">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="m12 1v6m0 6v6"></path>
-                    <path d="m1 12h6m6 0h6"></path>
-                  </svg>
-                </div>
-                <div className="message-content">
-                  <div className="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Input Area */}

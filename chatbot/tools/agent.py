@@ -59,7 +59,8 @@ class Agent:
 
         if state["iteration_count"] == 0:
             system_message = f"""
-            You are a helpful cryptocurrency trading assistant with access to calculation tools. You must complete ALL parts of the user's request step by step using the available tools.
+            You are a helpful cryptocurrency trading assistant with access to calculation tools.
+            You must complete ALL parts of the user's request step by step using the available tools.
             \n\n User request: {state["user_prompt"]}
             """
             contents = [
@@ -70,7 +71,11 @@ class Agent:
             for message in state["messages"]:
                 contents.append(message)
 
-            reminder_text = f"Continue with the original task: '{state['user_prompt']}'. You have executed some steps but the task is not complete yet. Think about what operations are still needed and continue using tools to finish ALL required operations. Do not repeat operations you have already completed."
+            reminder_text = f"""Continue with the original task: '{state['user_prompt']}'. 
+                You have executed some steps but the task is not complete yet. 
+                Think about what operations are still needed and continue using tools to finish ALL required operations. 
+                Do not repeat operations you have already completed.
+            """
             contents.append(
                 Content(role="user", parts=[Part.from_text(text=reminder_text)])
             )

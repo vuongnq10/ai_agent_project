@@ -6,6 +6,6 @@ import AppStream from "./AppStream.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AppStream />
+    <App />
   </StrictMode>
 );
