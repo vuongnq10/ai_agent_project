@@ -4,7 +4,8 @@
 # 4. LangGraph
 
 import asyncio
-from django.http import JsonResponse
+import time
+from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 from chatbot.tools.agent import Agent
 from chatbot.telegram.telegram import telegram_bot
 from chatbot.binance_connector.binance import BinanceConnector
@@ -22,6 +23,17 @@ def chat(request):
 
     response = agent(user_message)
     return JsonResponse({"success": True, "message": response})
+
+
+def chat_stream(request):
+    user_message = request.GET.get("query")
+
+    def event_stream():
+        for char in user_message:
+            yield f"data: {char}\n\n"
+            time.sleep(0.005) # Delay for 300ms
+
+    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
 
 def telegram_notify(request):
