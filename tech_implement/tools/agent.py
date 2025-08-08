@@ -94,7 +94,12 @@ For the current request, analyze what needs to be done and execute ALL steps."""
                 contents.append(msg)
 
             # Add a specific reminder based on the original task
-            reminder_text = f"Continue with the original task: '{state['user_prompt']}'. You have executed some steps but the task is not complete yet. Think about what operations are still needed and continue using tools to finish ALL required operations. Do not repeat operations you have already completed."
+            reminder_text = f"""
+                Continue with the original task: '{state['user_prompt']}'.
+                You have executed some steps but the task is not complete yet.
+                Think about what operations are still needed and continue using tools to finish ALL required operations. 
+                Do not repeat operations you have already completed.
+            """
             contents.append(
                 Content(role="user", parts=[Part.from_text(text=reminder_text)])
             )
