@@ -133,10 +133,10 @@ class BinanceConnector:
 
             print(f"Creating orders: {orders}")
 
-            response = self.client.rest_api.place_multiple_orders(orders)
+            # response = self.client.rest_api.place_multiple_orders(orders)
 
-            data = response.data()
-            result = [item.to_dict() for item in data]
+            # data = response.data()
+            # result = [item.to_dict() for item in data]
 
             asyncio.run(
                 telegram_bot(
@@ -152,7 +152,7 @@ class BinanceConnector:
                 )
             )
 
-            return result
+            return "success"
         except Exception as e:
             asyncio.run(
                 telegram_bot(

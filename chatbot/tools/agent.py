@@ -1,10 +1,8 @@
 # https://github.com/googleapis/python-genai
 
 import os
-import threading
-import queue
-import time
-from typing import Dict, Any, List, Literal, Generator
+import json
+from typing import Dict, Any, List, Literal
 from typing_extensions import TypedDict
 
 from google.genai import Client
@@ -35,7 +33,6 @@ class Agent:
     def __init__(self):
         self.cx_connector = CXConnector()
         self.graph = self._create_graph()
-        self.streaming_callback = None
 
     def _create_graph(self):
         workflow = StateGraph(AgentState)
@@ -84,59 +81,33 @@ class Agent:
                 Content(role="user", parts=[Part.from_text(text=reminder_text)])
             )
 
-        # Use streaming if callback is set
-        if self.streaming_callback:
-            response = self._generate_streaming_response(contents, state)
-        else:
-            response = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=contents,
-                config=GenerateContentConfig(tools=[self.cx_connector.tools]),
-            )
-
-        print(
-            f"🤖 Agent response (iteration {state['iteration_count'] + 1}):", response
-        )
-
-        if response and response.candidates:
-            state["messages"].append(response.candidates[0].content)
-
-        state["iteration_count"] += 1
-
-        return state
-
-    def _generate_streaming_response(self, contents: List[Content], state: AgentState):
-        """Generate streaming response and call the streaming callback for each chunk"""
-        print(
-            f"🔄 Starting streaming response (iteration {state['iteration_count'] + 1})..."
-        )
-
-        response_stream = client.models.generate_content_stream(
+        response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=contents,
             config=GenerateContentConfig(tools=[self.cx_connector.tools]),
         )
 
-        complete_response = None
-        accumulated_text = ""
+        # if response.candidates and response.candidates[0].content.parts:
+        #     part = response.candidates[0].content.parts[0]
+        #     if hasattr(part, "text") and part.text:
+        #         # send text back to whoever called the graph
+        #         yield part.text
 
-        for chunk in response_stream:
-            if chunk.candidates:
-                candidate = chunk.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    for part in candidate.content.parts:
-                        if hasattr(part, "text") and part.text:
-                            accumulated_text += part.text
-                            # Stream the text chunk via callback
-                            if self.streaming_callback:
-                                self.streaming_callback(part.text)
-                            print(f"📝 Streaming chunk: {part.text}")
+        # partial_text = ""
+        # for event in response.candidates:
+        #     if event.candidates and event.candidates[0].content.parts:
+        #         for part in event.candidates[0].content.parts:
+        #             if hasattr(part, "text") and part.text:
+        #                 partial_text += part.text
+        #                 # Yield partial tokens directly to caller
+        #                 yield {"partial_response": partial_text}
 
-                # Keep the last complete response for processing
-                complete_response = chunk
+        if response.candidates:
+            state["messages"].append(response.candidates[0].content)
 
-        print(f"✅ Streaming complete. Total text: {accumulated_text}")
-        return complete_response
+        state["iteration_count"] += 1
+
+        return state
 
     def _should_execute_tools(
         self, state: AgentState
@@ -207,118 +178,38 @@ class Agent:
         state["final_response"] = "No response generated."
         return state
 
-    def set_streaming_callback(self, callback):
-        """Set a callback function to receive streaming text chunks"""
-        self.streaming_callback = callback
+    def call_agent(self, prompt, max_iterations=20):
+        initial_state: AgentState = {
+            "messages": [],
+            "user_prompt": prompt,
+            "final_response": "",
+            "iteration_count": 0,
+            "max_iterations": max_iterations,
+        }
 
-    # def call_agent_simple_stream(self, prompt: str) -> Generator[str, None, None]:
-    #     """
-    #     Simple streaming interface that directly streams a single response without tools.
-    #     Use this for basic chatbot functionality with streaming.
-    #     """
-    #     contents = [Content(role="user", parts=[Part.from_text(text=prompt)])]
+        final_state = self.graph.invoke(initial_state)
 
-    #     response_stream = client.models.generate_content_stream(
-    #         model=GEMINI_MODEL,
-    #         contents=contents,
-    #         config=GenerateContentConfig(),
-    #     )
+        return final_state["final_response"]
 
-    #     for chunk in response_stream:
-    #         if chunk.candidates:
-    #             candidate = chunk.candidates[0]
-    #             if candidate.content and candidate.content.parts:
-    #                 for part in candidate.content.parts:
-    #                     if hasattr(part, "text") and part.text:
-    #                         print(f"📝 Streaming chunk: {part.text}")
-    #                         yield part.text
+    def __call__(self, prompt: str, max_iterations=20):
+        # return self.call_agent(prompt)
+        initial_state: AgentState = {
+            "messages": [],
+            "user_prompt": prompt,
+            "final_response": "",
+            "iteration_count": 0,
+            "max_iterations": max_iterations,
+        }
 
-    def call_agent_stream(
-        self, prompt: str, max_iterations: int = 20
-    ) -> Generator[str, None, None]:
-        """
-        Stream the agent response as it's generated using LangGraph with tools.
-        Yields text chunks as they arrive in real-time.
-        """
-        # Create a queue to pass chunks from the callback to the generator
-        chunk_queue = queue.Queue()
-        execution_done = threading.Event()
-        exception_holder = [None]
-
-        def stream_callback(chunk: str):
-            """Callback that puts chunks into the queue"""
-            chunk_queue.put(chunk)
-
-        def run_graph():
-            """Run the LangGraph execution in a separate thread"""
-            try:
-                # Set the streaming callback
-                original_callback = self.streaming_callback
-                self.streaming_callback = stream_callback
-
-                initial_state: AgentState = {
-                    "messages": [],
-                    "user_prompt": prompt,
-                    "final_response": "",
-                    "iteration_count": 0,
-                    "max_iterations": max_iterations,
-                }
-
-                # Execute the graph with streaming
-                self.graph.invoke(initial_state)
-
-                # Restore original callback
-                self.streaming_callback = original_callback
-
-            except Exception as e:
-                exception_holder[0] = e
-            finally:
-                # Signal that execution is done
-                execution_done.set()
-
-        # Start the graph execution in a separate thread
-        graph_thread = threading.Thread(target=run_graph)
-        graph_thread.start()
-
-        # Yield chunks as they arrive
-        while True:
-            try:
-                # Check if execution is done and queue is empty
-                if execution_done.is_set() and chunk_queue.empty():
-                    break
-
-                # Get chunk with timeout to allow checking execution status
-                chunk = chunk_queue.get(timeout=0.1)
-                yield chunk
-
-            except queue.Empty:
-                # Continue if queue is empty but execution is not done
-                if not execution_done.is_set():
-                    continue
-                else:
-                    break
-            except Exception as e:
-                print(f"Error in streaming: {e}")
-                break
-
-        # Wait for the thread to complete and check for exceptions
-        graph_thread.join()
-        if exception_holder[0]:
-            raise exception_holder[0]
-
-    # def call_agent(self, prompt, max_iterations=20):
-    #     initial_state: AgentState = {
-    #         "messages": [],
-    #         "user_prompt": prompt,
-    #         "final_response": "",
-    #         "iteration_count": 0,
-    #         "max_iterations": max_iterations,
-    #     }
-
-    #     final_state = self.graph.invoke(initial_state)
-
-    #     return final_state["final_response"]
-
-    def __call__(self, prompt: str):
-        # Use LangGraph streaming with tools for direct calls
-        return self.call_agent_stream(prompt)
+        for update in self.graph.stream(initial_state, stream_mode="updates"):
+            messages = update.get("messages", [])
+            for msg in messages:
+                if hasattr(msg, "parts"):
+                    for part in msg.parts:
+                        if hasattr(part, "text") and part.text:
+                            yield part.text
+                elif isinstance(msg, dict) and "parts" in msg:
+                    # If messages are dicts, not objects
+                    for part in msg["parts"]:
+                        if isinstance(part, dict) and "text" in part and part["text"]:
+                            yield part["text"]

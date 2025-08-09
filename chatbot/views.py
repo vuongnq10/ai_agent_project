@@ -24,8 +24,8 @@ def chat(request):
     def event_stream():
         try:
             for chunk in agent(user_message):
-                if chunk:  # Only yield non-empty chunks
-                    yield f"data: {chunk}\n\n"
+                yield f"data: {chunk}\n\n"
+
         except Exception as e:
             print(f"Error in streaming: {e}")
             yield f"data: Error: {str(e)}\n\n"
