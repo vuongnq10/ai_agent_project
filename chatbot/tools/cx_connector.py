@@ -109,7 +109,7 @@ class CXConnector:
 
         return {
             "result": {
-                "current_price": self.current_price,
+                # "current_price": self.current_price,
                 "bollinger_bands": booinger_bands,
                 "sma": sma,
                 "market_structure": market_structure,
