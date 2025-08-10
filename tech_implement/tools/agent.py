@@ -10,7 +10,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
-GEMINI_MODEL = "gemini-2.0-flash-001"
+GEMINI_MODEL = "gemini-2.5-flash"
 API_KEY = os.getenv("GOOGLE_API_KEY")
 
 calculator = Calculator()
@@ -77,32 +77,24 @@ IMPORTANT: When a user asks for multiple operations (like "get 2 random numbers 
 
 For the current request, analyze what needs to be done and execute ALL steps."""
 
-            contents = [
-                Content(
-                    role="user",
-                    parts=[
-                        Part.from_text(
-                            text=f"{system_message}\n\nUser request: {state['user_prompt']}\n\nNow execute all necessary steps to complete this request."
-                        )
-                    ],
-                )
-            ]
+            user_content = Content(
+                role="user",
+                parts=[
+                    Part.from_text(
+                        text=f"{system_message}\n\nUser request: {state['user_prompt']}\n\nNow execute all necessary steps to complete this request."
+                    )
+                ],
+            )
+            
+            contents = [user_content]
+            
+            # Add the initial user message to the conversation history
+            state["messages"].append(user_content)
         else:
-            # Subsequent iterations - include all previous messages plus a reminder
+            # Subsequent iterations - include all previous messages
             contents = []
             for msg in state["messages"]:
                 contents.append(msg)
-
-            # Add a specific reminder based on the original task
-            reminder_text = f"""
-                Continue with the original task: '{state['user_prompt']}'.
-                You have executed some steps but the task is not complete yet.
-                Think about what operations are still needed and continue using tools to finish ALL required operations. 
-                Do not repeat operations you have already completed.
-            """
-            contents.append(
-                Content(role="user", parts=[Part.from_text(text=reminder_text)])
-            )
 
         response = client.models.generate_content(
             model=GEMINI_MODEL,
@@ -172,24 +164,33 @@ For the current request, analyze what needs to be done and execute ALL steps."""
                         tool_result = tool_func(**args)
                         function_response = Part.from_function_response(
                             name=tool_name,
-                            response=tool_result,
+                            response={"result": tool_result},
                         )
                         print(f"✅ Tool {tool_name} result: {tool_result}")
                     except (AttributeError, TypeError) as e:
-                        function_response = Part.from_text(
-                            text=f"Error: Tool {tool_name} not found or not callable. {e}"
+                        function_response = Part.from_function_response(
+                            name=tool_name,
+                            response={"error": f"Tool {tool_name} not found or not callable. {e}"},
                         )
                         print(f"❌ Tool error: {e}")
                     except Exception as e:
-                        function_response = Part.from_text(text=f"Error: {str(e)}")
+                        function_response = Part.from_function_response(
+                            name=tool_name,
+                            response={"error": str(e)},
+                        )
                         print(f"❌ Execution error: {e}")
 
                     tool_responses.append(function_response)
 
         # Add tool responses to messages if any were executed
         if tool_responses:
-            # Create a content object with tool responses
-            tool_content = Content(role="user", parts=tool_responses)
+            # Create a content object with tool responses using the correct role
+            # Function responses should be added as user messages with functionResponse parts
+            function_response_parts = []
+            for tool_response in tool_responses:
+                function_response_parts.append(tool_response)
+            
+            tool_content = Content(role="user", parts=function_response_parts)
             state["messages"].append(tool_content)
             print("🔧 Tool responses added to conversation")
 

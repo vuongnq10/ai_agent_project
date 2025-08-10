@@ -45,7 +45,7 @@ function App() {
         )}`
       );
       const data = await response.json();
-      const aiMessage = { role: "assistant", content: data.message };
+      const aiMessage = { role: "assistant", content: data.data };
       setChatHistory((prev) => [...prev, aiMessage]);
     } catch (error) {
       console.error("Error fetching chat response:", error);

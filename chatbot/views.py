@@ -2,6 +2,7 @@
 # 2. Langchain
 # 3. LLMs
 # 4. LangGraph
+# 5. langgraph with condition like AI gives a response to ask if user wants to continue
 
 import asyncio
 import time
@@ -21,16 +22,26 @@ def chat(request):
 
     print("User message:", user_message)
 
-    def event_stream():
-        try:
-            for chunk in agent(user_message):
-                yield f"data: {chunk}\n\n"
+    message = agent(user_message)
 
-        except Exception as e:
-            print(f"Error in streaming: {e}")
-            yield f"data: Error: {str(e)}\n\n"
+    return JsonResponse({"success": True, "data": message})
 
-    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
+# def chat(request):
+#     user_message = request.GET.get("query")
+
+#     print("User message:", user_message)
+
+#     def event_stream():
+#         try:
+#             for chunk in agent(user_message):
+#                 yield f"data: {chunk}\n\n"
+
+#         except Exception as e:
+#             print(f"Error in streaming: {e}")
+#             yield f"data: Error: {str(e)}\n\n"
+
+#     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
 
 def chat_stream(request):
