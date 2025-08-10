@@ -86,41 +86,104 @@ class CXConnector:
         candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
         self.current_price = candles[-1][4]
 
-        booinger_bands = self.bollinger_bands(candles)
-        sma = self.sma(candles)
-        market_structure = self.calculate_market_structure(candles)
-        liquidity_pools = self.liquidity_pools(candles)
-        order_blocks = self.order_blocks(candles)
-        rsi = self.rsi(candles)
-        levels = self.trade_levels(
-            self.current_price, candles, market_structure["structure"]
-        )
-        # asyncio.run(
-        #     telegram_bot(
-        #         f""" 
-        #         Trade Levels {symbol}:
-        #         Entry: {levels['entry']}
-        #         Stop Loss: {levels['stopLoss']}
-        #         Take Profit: {levels['takeProfit']}
-        #         Trend: {market_structure["structure"]}
-        #         """
-        #     )
-        # )
+        booinger_bands = self._bollinger_bands(candles)
+        ema_7 = self._ema(candles, 7)
+        ema_20 = self._ema(candles, 20)
 
-        return {
-            "result": {
-                # "current_price": self.current_price,
-                "bollinger_bands": booinger_bands,
-                "sma": sma,
-                "market_structure": market_structure,
-                "rsi": rsi,
-                "liquidity_pools": liquidity_pools,
-                "order_blocks": order_blocks,
-                "levels": levels,
-            }
+        rsi_6 = self._rsi(candles, 6)
+        rsi_12 = self._rsi(candles, 12)
+        rsi_24 = self._rsi(candles, 24)
+
+        market_structure = self._calculate_market_structure(candles)
+        liquidity_pools = self._liquidity_pools(candles)
+        order_blocks = self._order_blocks(candles)
+        fair_value_gaps = self._fair_value_gaps(candles)
+
+        data = {
+            "bollinger_bands": booinger_bands,
+            rsi_6: rsi_6,
+            rsi_12: rsi_12,
+            rsi_24: rsi_24,
+            "ema_7": ema_7,
+            "ema_20": ema_20,
+            "market_structure": market_structure,
+            "liquidity_pools": liquidity_pools,
+            "order_blocks": order_blocks,
+            "fair_value_gaps": fair_value_gaps,
         }
 
-    def calculate_atr(self, candles):
+        return {"result": data}
+
+    def _ema(self, candles, period=20):
+        df = pd.DataFrame(
+            candles,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+
+        ema_series = df["close"].ewm(span=period, adjust=False).mean()
+
+        return ema_series.tolist()
+
+    def save_trade_setup(
+        self,
+        symbol: str,
+        side: str,
+        entry: float,
+    ):
+        try:
+            response = binance_connector.create_orders(
+                symbol=symbol,
+                side=side,
+                order_price=entry,
+                current_price=self.current_price,
+            )
+
+            return {"result": response}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _fair_value_gaps(self, candles):
+        df = pd.DataFrame(
+            candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
+
+        gaps = []
+
+        # Loop through candle triples
+        for i in range(2, len(df)):
+            c1 = df.iloc[i - 2]
+            c2 = df.iloc[i - 1]
+            c3 = df.iloc[i]
+
+            # Bullish FVG: low of c3 > high of c1
+            if c3["low"] > c1["high"]:
+                gaps.append(
+                    {
+                        "type": "bullish",
+                        "start_index": i - 2,
+                        "end_index": i,
+                        "gap_high": c3["low"],  # top of the gap
+                        "gap_low": c1["high"],  # bottom of the gap
+                        "timestamp": int(c2["timestamp"]),
+                    }
+                )
+
+            # Bearish FVG: high of c3 < low of c1
+            elif c3["high"] < c1["low"]:
+                gaps.append(
+                    {
+                        "type": "bearish",
+                        "start_index": i - 2,
+                        "end_index": i,
+                        "gap_high": c1["low"],  # top of the gap
+                        "gap_low": c3["high"],  # bottom of the gap
+                        "timestamp": int(c2["timestamp"]),
+                    }
+                )
+
+        return gaps
+
+    def _calculate_atr(self, candles):
         df = pd.DataFrame(
             candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
         )
@@ -133,23 +196,7 @@ class CXConnector:
             tr_values.append(tr)
         return sum(tr_values) / len(tr_values) if tr_values else 0
 
-    def trade_levels(self, current_price, candles, trend):
-        atr = self.calculate_atr(candles)
-
-        if trend.startswith("BULLISH"):
-            # Long setup
-            entry = current_price
-            stop_loss = current_price - atr
-            take_profit = current_price + (2 * atr)
-        elif trend.startswith("BEARISH"):
-            # Short setup
-            entry = current_price
-            stop_loss = current_price + atr
-            take_profit = current_price - (2 * atr)
-
-        return {"entry": entry, "stopLoss": stop_loss, "takeProfit": take_profit}
-
-    def calculate_market_structure(self, candles):
+    def _calculate_market_structure(self, candles):
         df = pd.DataFrame(
             candles,
             columns=["timestamp", "open", "high", "low", "close", "volume"],
@@ -192,7 +239,7 @@ class CXConnector:
             "swing_lows": swing_lows,
         }
 
-    def bollinger_bands(self, candles, period=20, multiplier=2):
+    def _bollinger_bands(self, candles, period=20, multiplier=2):
         data_frame = pd.DataFrame(
             candles[-period:],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
@@ -210,16 +257,7 @@ class CXConnector:
             "sma": data_frame["sma"].iloc[-1],
         }
 
-    def sma(self, candles, period=20):
-        data_framge = pd.DataFrame(
-            candles[-period:],
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-        data_framge["sma"] = data_framge["close"].rolling(window=period).mean()
-
-        return data_framge["sma"].iloc[-1]
-
-    def rsi(self, candles, period=14):
+    def _rsi(self, candles, period=14):
         data_frame = pd.DataFrame(
             candles[-period:],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
@@ -234,7 +272,7 @@ class CXConnector:
 
         return rsi.iloc[-1]
 
-    def liquidity_pools(self, candles):
+    def _liquidity_pools(self, candles):
         df = pd.DataFrame(
             candles,
             columns=["timestamp", "open", "high", "low", "close", "volume"],
@@ -272,7 +310,7 @@ class CXConnector:
 
         return sorted(pools, key=lambda x: x["strength"], reverse=True)[:3]
 
-    def order_blocks(self, candles):
+    def _order_blocks(self, candles):
         df = pd.DataFrame(
             candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
         )
@@ -313,21 +351,3 @@ class CXConnector:
                     )
 
         return sorted(order_blocks, key=lambda x: x["strength"], reverse=True)[:3]
-
-    def save_trade_setup(
-        self,
-        symbol: str,
-        side: str,
-        entry: float,
-    ):
-        try:
-            response = binance_connector.create_orders(
-                symbol=symbol,
-                side=side,
-                order_price=entry,
-                current_price=self.current_price,
-            )
-
-            return {"result": response}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}

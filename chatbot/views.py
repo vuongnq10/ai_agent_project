@@ -10,11 +10,9 @@ from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 from chatbot.tools.agent import Agent
 from chatbot.telegram.telegram import telegram_bot
 from chatbot.binance_connector.binance import BinanceConnector
-from chatbot.tools.cx_connector import CXConnector
 
 agent = Agent()
 binance_connector = BinanceConnector()
-cx_connector = CXConnector()
 
 
 def chat(request):
@@ -87,11 +85,3 @@ def telegram_notify(request):
         return JsonResponse({"success": True, "response": response})
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)})
-
-
-def test_binance(request):
-    coin = request.GET.get("coin", "No coin provided")
-    ticker = cx_connector.smc_analysis(coin, "1h")
-    # bollinger_bands = cx_connector.bollinger_bands(ticker["result"])
-
-    return JsonResponse({"success": True, "data": ticker})
