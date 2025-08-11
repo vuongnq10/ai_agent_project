@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'chatbot',
     'tech_implement',
+    'chat_app',
     'corsheaders',
 ]
 
