@@ -4,7 +4,7 @@ import os
 from typing import Dict, Any, List, Literal
 from google.genai import Client
 from google.genai.types import HttpOptions, GenerateContentConfig, Content, Part
-from chatbot.tools.cx_connector import CXConnector
+from broker_bot.tools.cx_connector import CXConnector
 
 from langgraph.graph import StateGraph, END
 from typing_extensions import TypedDict
@@ -209,7 +209,7 @@ from google.genai import Client
 from google.genai.types import HttpOptions, GenerateContentConfig, Content, Part
 from langgraph.graph import StateGraph, END
 
-from chatbot.tools.cx_connector import CXConnector
+from broker_bot.tools.cx_connector import CXConnector
 
 GEMINI_MODEL = "gemini-2.0-flash-001"
 API_KEY = os.getenv("GOOGLE_API_KEY")

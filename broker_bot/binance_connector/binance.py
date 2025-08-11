@@ -4,7 +4,7 @@
 import os
 import asyncio
 
-from chatbot.telegram.telegram import telegram_bot
+from broker_bot.telegram.telegram import telegram_bot
 
 from binance_common.configuration import ConfigurationRestAPI
 from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futures import (

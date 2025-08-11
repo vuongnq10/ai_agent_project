@@ -2,7 +2,7 @@ import ccxt
 import pandas as pd
 from google.genai.types import Tool, FunctionDeclaration
 
-from chatbot.binance_connector.binance import BinanceConnector
+from broker_bot.binance_connector.binance import BinanceConnector
 
 binance = ccxt.binance({})
 binance_connector = BinanceConnector()

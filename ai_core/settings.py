@@ -49,7 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'chatbot',
+    'broker_bot',
     'tech_implement',
     'chat_app',
     'corsheaders',

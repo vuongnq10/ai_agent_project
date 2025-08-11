@@ -40,7 +40,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/chatbot?query=${encodeURIComponent(
+        `http://127.0.0.1:8000/broker_bot?query=${encodeURIComponent(
           messageToSend
         )}`
       );

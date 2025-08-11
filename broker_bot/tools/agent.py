@@ -9,7 +9,7 @@ from langgraph.graph import StateGraph, END
 from google.genai import Client
 from google.genai.types import HttpOptions, GenerateContentConfig, Content, Part
 
-from chatbot.tools.cx_connector import CXConnector
+from broker_bot.tools.cx_connector import CXConnector
 
 GEMINI_MODEL = "gemini-2.5-flash"
 API_KEY = os.getenv("GOOGLE_API_KEY")

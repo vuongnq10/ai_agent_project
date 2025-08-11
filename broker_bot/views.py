@@ -7,9 +7,9 @@
 import asyncio
 import time
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
-from chatbot.tools.agent import Agent
-from chatbot.telegram.telegram import telegram_bot
-from chatbot.binance_connector.binance import BinanceConnector
+from broker_bot.tools.agent import Agent
+from broker_bot.telegram.telegram import telegram_bot
+from broker_bot.binance_connector.binance import BinanceConnector
 
 agent = Agent()
 binance_connector = BinanceConnector()
