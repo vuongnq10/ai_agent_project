@@ -22,7 +22,7 @@ const AppChat: React.FC = () => {
     try {
       // Simulate a network request to a mock URL
       const response = await fetch(
-        `http://127.0.0.1:8000/chat_app?query=${message}`
+        `http://127.0.0.1:8000/chat_app?query=${message}&session_id=id_12345`
       );
       const data = await response.json();
 

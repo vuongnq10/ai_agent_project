@@ -9,10 +9,8 @@ import time
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 from broker_bot.tools.agent import Agent
 from broker_bot.telegram.telegram import telegram_bot
-from broker_bot.binance_connector.binance import BinanceConnector
 
 agent = Agent()
-binance_connector = BinanceConnector()
 
 
 def chat(request):
