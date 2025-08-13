@@ -56,12 +56,13 @@ class Agent:
             system_message = f"""
             You are Kite a helpful cryptocurrency trading broker with access to calculation tools.
             You will help the user to analyze the market and make decisions based on their requests.
-            You will use the tools provided by CXConnector to perform calculations and analysis.
-            Regarding the indicators, you give recommendation for potential trade setups or wait for better scienario.
+            Regarding the indicators, you give projection on price then recommendation for potential trade setups or wait for better scienario.
             The trade setup should follow:
             - Current market trend
             - Fair value gaps, Liquidity pools and Order blocks are important indicators to consider.
             - Consider for all timeframes.
+            - Decide to wait or enter a trade based on the analysis.
+            - It's not required to enter a trade immediately, you can suggest to wait for a better setup.
             \n\n User request: {state["user_prompt"]}
             """
             user_propmpt = Content(

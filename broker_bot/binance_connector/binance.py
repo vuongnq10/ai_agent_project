@@ -66,6 +66,8 @@ class BinanceConnector:
         side: str,
         order_price: float,
         current_price: float,
+        take_profit: float,
+        stop_loss: float,
     ):
         try:
             symbol_config = self.get_exchange_info(symbol)
@@ -119,14 +121,14 @@ class BinanceConnector:
                     "symbol": symbol,
                     "side": "BUY" if side == "SELL" else "SELL",
                     "type": "TAKE_PROFIT_MARKET",
-                    "stopPrice": str(profit_price),
+                    "stopPrice": take_profit,  # str(profit_price),
                     "closePosition": "true",
                 },
                 {
                     "symbol": symbol,
                     "side": "BUY" if side == "SELL" else "SELL",
                     "type": "STOP_MARKET",
-                    "stopPrice": str(stop_price),
+                    "stopPrice": stop_loss,  # str(stop_price),
                     "closePosition": "true",
                 },
             ]

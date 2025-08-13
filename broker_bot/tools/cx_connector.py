@@ -37,7 +37,7 @@ class CXConnector:
                     },
                 ),
                 FunctionDeclaration(
-                    name="save_trade_setup",
+                    name="create_order",
                     description="Save a 20 leverage trade setup with entry, stop loss, and take profit.",
                     parameters={
                         "type": "object",
@@ -54,21 +54,21 @@ class CXConnector:
                                 "type": "number",
                                 "description": "Entry price for the trade. ",
                             },
-                            # "stop_loss": {
-                            #     "type": "string",
-                            #     "description": "Stop loss price for the trade. String representation of a float.",
-                            # },
-                            # "take_profit": {
-                            #     "type": "string",
-                            #     "description": "Take profit price for the trade. String representation of a float.",
-                            # },
+                            "stop_loss": {
+                                "type": "string",
+                                "description": "Stop loss price for the trade. String representation of a float.",
+                            },
+                            "take_profit": {
+                                "type": "string",
+                                "description": "Take profit price for the trade. String representation of a float.",
+                            },
                         },
                         "required": [
                             "symbol",
                             "side",
                             "entry",
-                            # "stop_loss",
-                            # "take_profit",
+                            "take_profit",
+                            "stop_loss",
                         ],
                     },
                 ),
@@ -124,11 +124,13 @@ class CXConnector:
 
         return ema_series.tolist()
 
-    def save_trade_setup(
+    def create_order(
         self,
         symbol: str,
         side: str,
         entry: float,
+        take_profit: float,
+        stop_loss: float,
     ):
         try:
             response = binance_connector.create_orders(
@@ -136,6 +138,8 @@ class CXConnector:
                 side=side,
                 order_price=entry,
                 current_price=self.current_price,
+                take_profit=take_profit,
+                stop_loss=stop_loss,
             )
 
             return {"result": response}
