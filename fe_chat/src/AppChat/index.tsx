@@ -21,9 +21,15 @@ const AppChat: React.FC = () => {
 
     try {
       // Simulate a network request to a mock URL
-      const response = await fetch(
-        `http://127.0.0.1:8000/chat_app?query=${message}&session_id=id_12345`
-      );
+      const formData = new FormData();
+      formData.append("query", message);
+
+      const response = await fetch(`http://localhost:8000/chat_app`, {
+        // Changed to localhost
+        method: "POST",
+        body: formData,
+        credentials: "include", // This ensures cookies are sent with the request
+      });
       const data = await response.json();
 
       if (!data.ok) {
