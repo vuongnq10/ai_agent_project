@@ -23,4 +23,5 @@ urlpatterns = [
     path("broker_bot", include("broker_bot.urls")),
     path("tech_implement", include("tech_implement.urls")),
     path("chat_app", include("chat_app.urls")),
+    path("master_agent", include("master_agent.urls")),
 ]
