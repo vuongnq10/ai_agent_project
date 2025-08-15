@@ -69,6 +69,16 @@ class BinanceConnector:
         take_profit: float,
         stop_loss: float,
     ):
+        if (side == "BUY" and order_price > current_price) or (
+            side == "SELL" and order_price < current_price
+        ):
+            asyncio.run(
+                telegram_bot(
+                    f"Order price {order_price} is not valid for current price {current_price} for side {side}"
+                )
+            )
+            return "Failed"
+
         try:
             symbol_config = self.get_exchange_info(symbol)
             filter = symbol_config.get("filters", [])
