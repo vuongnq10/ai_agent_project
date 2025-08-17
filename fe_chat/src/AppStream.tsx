@@ -40,7 +40,7 @@ function App() {
 
     try {
       const eventSource = new EventSource(
-        `http://127.0.0.1:8000/broker_bot?query=${encodeURIComponent(
+        `http://127.0.0.1:8000/master_agent?query=${encodeURIComponent(
           messageToSend
         )}`
       );
@@ -49,9 +49,10 @@ function App() {
       setChatHistory((prev) => [...prev, { role: "assistant", content: "" }]);
 
       eventSource.onmessage = (event) => {
-        const char = event.data;
+        const { character } = JSON.parse(event.data);
+
+        const char = character;
         fullMessage += char;
-        // await new Promise((resolve) => setTimeout(resolve, 300)); // Delay for 300ms
         setChatHistory((prev) => {
           const newChatHistory = [...prev];
           newChatHistory[newChatHistory.length - 1].content = fullMessage;
@@ -59,11 +60,11 @@ function App() {
         });
       };
 
-      eventSource.onerror = (error) => {
-        console.error("EventSource failed:", error);
+      eventSource.addEventListener("end", () => {
+        console.log("Stream finished ✅");
         eventSource.close();
         setLoading(false);
-      };
+      });
     } catch (error) {
       console.error("Error setting up EventSource:", error);
       const errorMessage = {
@@ -78,7 +79,7 @@ function App() {
   const clearChat = () => {
     setChatHistory([]);
   };
-
+  // console.log("chatHistory", chatHistory);
   return (
     <div className="app-container">
       {/* Header */}
