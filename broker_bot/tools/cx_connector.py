@@ -14,7 +14,7 @@ class CXConnector:
             function_declarations=[
                 FunctionDeclaration(
                     name="smc_analysis",
-                    description="Perform Smart Money Concept analysis on the given symbol and timeframe.",
+                    description="Perform Smart Money Concept analysis on live candle chart by given symbol and timeframe.",
                     parameters={
                         "type": "object",
                         "properties": {
@@ -24,7 +24,7 @@ class CXConnector:
                             },
                             "timeframe": {
                                 "type": "string",
-                                "description": "The timeframe for the analysis (e.g., '1h', '30m').",
+                                "description": "The timeframe for the analysis (e.g., 1h, 2h, 4h ).",
                                 "default": "1h",
                             },
                             "limit": {
@@ -101,9 +101,9 @@ class CXConnector:
 
         data = {
             "bollinger_bands": booinger_bands,
-            rsi_6: rsi_6,
-            rsi_12: rsi_12,
-            rsi_24: rsi_24,
+            "rsi_6": rsi_6,
+            "rsi_12": rsi_12,
+            "rsi_24": rsi_24,
             "ema_7": ema_7,
             "ema_20": ema_20,
             "market_structure": market_structure,

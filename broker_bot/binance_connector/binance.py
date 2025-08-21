@@ -28,8 +28,8 @@ configuration = ConfigurationRestAPI(
 
 LEVERAGE = 20
 ORDER_AMOUNT = 25
-EXPECTED_PROFIT = 0.25
-EXPECTED_STOP_LOSS = 0.25
+EXPECTED_PROFIT = 0.3
+EXPECTED_STOP_LOSS = 0.3
 
 
 class BinanceConnector:
@@ -74,7 +74,7 @@ class BinanceConnector:
         ):
             asyncio.run(
                 telegram_bot(
-                    f"Order price {order_price} is not valid for current price {current_price} for side {side}"
+                    f"Order price {order_price} for {symbol} is not valid for current price {current_price} for side {side}"
                 )
             )
             return "Failed"
@@ -145,10 +145,10 @@ class BinanceConnector:
 
             print(f"Creating orders: {orders}")
 
-            # response = self.client.rest_api.place_multiple_orders(orders)
+            response = self.client.rest_api.place_multiple_orders(orders)
 
-            # data = response.data()
-            # result = [item.to_dict() for item in data]
+            data = response.data()
+            result = [item.to_dict() for item in data]
 
             asyncio.run(
                 telegram_bot(
