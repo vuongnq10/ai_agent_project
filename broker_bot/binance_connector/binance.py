@@ -18,7 +18,7 @@ BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
     api_secret=BINANCE_SECRET_KEY,
-    base_path=BINANCE_BASE_URL,
+    # base_path=BINANCE_BASE_URL,
 )
 
 # LEVERAGE = 20
