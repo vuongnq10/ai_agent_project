@@ -28,8 +28,8 @@ configuration = ConfigurationRestAPI(
 
 LEVERAGE = 20
 ORDER_AMOUNT = 25
-EXPECTED_PROFIT = 0.3
-EXPECTED_STOP_LOSS = 0.3
+EXPECTED_PROFIT = 0.35
+EXPECTED_STOP_LOSS = 0.25
 
 
 class BinanceConnector:
@@ -101,7 +101,7 @@ class BinanceConnector:
                 temp_profit = order_price * (
                     1 + float(EXPECTED_PROFIT) / float(LEVERAGE)
                 )
-                temp_stop = order_price * (1 - float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_stop = order_price * (1 - float(EXPECTED_STOP_LOSS) / float(LEVERAGE))
 
                 profit_price = self.match_precision(
                     temp_profit, price_filter["tickSize"]
@@ -111,7 +111,7 @@ class BinanceConnector:
                 temp_profit = order_price * (
                     1 - float(EXPECTED_PROFIT) / float(LEVERAGE)
                 )
-                temp_stop = order_price * (1 + float(EXPECTED_PROFIT) / float(LEVERAGE))
+                temp_stop = order_price * (1 + float(EXPECTED_STOP_LOSS) / float(LEVERAGE))
 
                 profit_price = self.match_precision(
                     temp_profit, price_filter["tickSize"]
@@ -138,7 +138,7 @@ class BinanceConnector:
                     "symbol": symbol,
                     "side": "BUY" if side == "SELL" else "SELL",
                     "type": "STOP_MARKET",
-                    "stopPrice": stop_loss,  # str(stop_price),
+                    "stopPrice": str(stop_price),
                     "closePosition": "true",
                 },
             ]
