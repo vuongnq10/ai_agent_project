@@ -18,7 +18,7 @@ BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
     api_secret=BINANCE_SECRET_KEY,
-    # base_path=BINANCE_BASE_URL,
+    base_path=BINANCE_BASE_URL,
 )
 
 # LEVERAGE = 20
@@ -101,7 +101,9 @@ class BinanceConnector:
                 temp_profit = order_price * (
                     1 + float(EXPECTED_PROFIT) / float(LEVERAGE)
                 )
-                temp_stop = order_price * (1 - float(EXPECTED_STOP_LOSS) / float(LEVERAGE))
+                temp_stop = order_price * (
+                    1 - float(EXPECTED_STOP_LOSS) / float(LEVERAGE)
+                )
 
                 profit_price = self.match_precision(
                     temp_profit, price_filter["tickSize"]
@@ -111,7 +113,9 @@ class BinanceConnector:
                 temp_profit = order_price * (
                     1 - float(EXPECTED_PROFIT) / float(LEVERAGE)
                 )
-                temp_stop = order_price * (1 + float(EXPECTED_STOP_LOSS) / float(LEVERAGE))
+                temp_stop = order_price * (
+                    1 + float(EXPECTED_STOP_LOSS) / float(LEVERAGE)
+                )
 
                 profit_price = self.match_precision(
                     temp_profit, price_filter["tickSize"]
