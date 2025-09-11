@@ -18,7 +18,7 @@ BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
     api_secret=BINANCE_SECRET_KEY,
-    base_path=BINANCE_BASE_URL,
+    # base_path=BINANCE_BASE_URL,
 )
 
 # LEVERAGE = 20
@@ -149,22 +149,23 @@ class BinanceConnector:
 
             print(f"Creating orders: {orders}")
 
-            response = self.client.rest_api.place_multiple_orders(orders)
+            self.client.rest_api.place_multiple_orders(orders)
 
-            data = response.data()
-            result = [item.to_dict() for item in data]
+            # data = response.data()
+            # result = [item.to_dict() for item in data]
 
             asyncio.run(
                 telegram_bot(
                     f"""
-                        Create an order for {symbol} with side {side} and price {order_price}:
-                        Order type: {side}
-                        Current Price: ${current_price}
-                        Order Price: ${real_price}
-                        Quantity: {quantity}
-                        Profit Price: ${profit_price}
-                        Stop Price: ${stop_price}
-                    """,
+                    🛒 Create an order for {symbol}  
+                    ➡️ Side: {side}  
+                    🏷️ Order Type: {side}  
+                    💰 Current Price: ${current_price}  
+                    🎯 Order Price: ${real_price}  
+                    📦 Quantity: {quantity}  
+                    📈 Profit Price: ${profit_price}  
+                    🛑 Stop Price: ${stop_price}  
+                    """
                 )
             )
 

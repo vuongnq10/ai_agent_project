@@ -1,6 +1,11 @@
 import ccxt
+import asyncio
 import pandas as pd
+import numpy as np
+from datetime import datetime
 from google.genai.types import Tool, FunctionDeclaration
+
+from broker_bot.telegram.telegram import telegram_bot
 
 from broker_bot.binance_connector.binance import BinanceConnector
 
@@ -86,7 +91,7 @@ class CXConnector:
         candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
         self.current_price = candles[-1][4]
 
-        booinger_bands = self._bollinger_bands(candles)
+        bollinger_bands = self._bollinger_bands(candles)
         ema_7 = self._ema(candles, 7)
         ema_20 = self._ema(candles, 20)
 
@@ -100,7 +105,7 @@ class CXConnector:
         fair_value_gaps = self._fair_value_gaps(candles)
 
         data = {
-            "bollinger_bands": booinger_bands,
+            "bollinger_bands": bollinger_bands,
             "rsi_6": rsi_6,
             "rsi_12": rsi_12,
             "rsi_24": rsi_24,
@@ -112,7 +117,58 @@ class CXConnector:
             "fair_value_gaps": fair_value_gaps,
         }
 
+        # asyncio.run(
+        #     telegram_bot(
+        #         f"""
+        #             📊 Symbol: {symbol}
+        #             🕒 Timeframe: {timeframe}
+
+        #             {self._format_array(name="Fair Value Gaps", arr=fair_value_gaps, emoji="📈")}
+        #             Market Structure: {market_structure["structure"]}
+        #             {self._format_array(name="Swing high", arr=market_structure["swing_highs"], emoji="🏗️")}
+        #             {self._format_array(name="Swing low", arr=market_structure["swing_lows"], emoji="🏗️")}
+        #             {self._format_array(name="Liquidity Pools", arr=liquidity_pools, emoji="💧")}
+        #             {self._format_array(name="Order Blocks", arr=order_blocks, emoji="🧱")}
+
+        #             🎯 Bollinger Bands: {bollinger_bands}
+        #             📉 EMA 7: {ema_7[-1]}, EMA 20: {ema_20[-1]}
+        #             📊 RSI 6: {rsi_6}, RSI 12: {rsi_12}, RSI 24: {rsi_24}
+        #         """,
+        #     )
+        # )
+
         return {"result": data}
+
+    def _format_array(self, name, arr, max_items=3, emoji="📌"):
+        """Format array/dict list into a more visual Telegram-friendly message"""
+        if not arr:
+            return f"{emoji} {name}: None"
+
+        formatted = []
+        for item in arr[:max_items]:
+            if isinstance(item, dict):
+                lines = []
+                for k, v in item.items():
+                    # Convert numpy floats
+                    if isinstance(v, (np.floating, float)):
+                        v = round(float(v), 2)
+                    # Convert timestamp if looks like ms epoch
+                    if "time" in k and isinstance(v, (int, float)) and v > 1e12:
+                        v = datetime.utcfromtimestamp(v / 1000).strftime(
+                            "%Y-%m-%d %H:%M UTC"
+                        )
+                    lines.append(f"      • {k}: {v}")
+                block = "\n".join(lines)
+                formatted.append(f"   🔹 {block}")
+            else:
+                if isinstance(item, (np.floating, float)):
+                    item = round(float(item), 2)
+                formatted.append(f"   🔹 {item}")
+
+        if len(arr) > max_items:
+            formatted.append(f"   ... (+{len(arr) - max_items} more)")
+
+        return f"{emoji} {name}:\n" + "\n".join(formatted)
 
     def _ema(self, candles, period=20):
         df = pd.DataFrame(
