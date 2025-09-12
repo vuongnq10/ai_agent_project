@@ -7,7 +7,13 @@ from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
 
 from google.genai import Client
-from google.genai.types import HttpOptions, GenerateContentConfig, Content, Part
+from google.genai.types import (
+    HttpOptions,
+    GenerateContentConfig,
+    Content,
+    Part,
+    ThinkingConfig,
+)
 
 from broker_bot.tools.cx_connector import CXConnector
 
@@ -65,6 +71,7 @@ class Agent:
             - It's not required to enter a trade immediately, you can suggest to wait for a better setup.
             \n\n User request: {state["user_prompt"]}
             """
+
             user_propmpt = Content(
                 role="user", parts=[Part.from_text(text=system_message)]
             )
@@ -79,7 +86,10 @@ class Agent:
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=contents,
-            config=GenerateContentConfig(tools=[self.cx_connector.tools]),
+            config=GenerateContentConfig(
+                tools=[self.cx_connector.tools],
+                thinking_config=ThinkingConfig(include_thoughts=True),
+            ),
         )
 
         print(
