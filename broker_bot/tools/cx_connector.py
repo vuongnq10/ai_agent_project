@@ -105,37 +105,17 @@ class CXConnector:
         fair_value_gaps = self._fair_value_gaps(candles)
 
         data = {
-            "bollinger_bands": bollinger_bands,
-            "rsi_6": rsi_6,
-            "rsi_12": rsi_12,
-            "rsi_24": rsi_24,
-            "ema_7": ema_7,
-            "ema_20": ema_20,
+            # "bollinger_bands": bollinger_bands,
+            # "rsi_6": rsi_6,
+            # "rsi_12": rsi_12,
+            # "rsi_24": rsi_24,
+            # "ema_7": ema_7,
+            # "ema_20": ema_20,
             "market_structure": market_structure,
             "liquidity_pools": liquidity_pools,
             "order_blocks": order_blocks,
             "fair_value_gaps": fair_value_gaps,
         }
-
-        # asyncio.run(
-        #     telegram_bot(
-        #         f"""
-        #             📊 Symbol: {symbol}
-        #             🕒 Timeframe: {timeframe}
-
-        #             {self._format_array(name="Fair Value Gaps", arr=fair_value_gaps, emoji="📈")}
-        #             Market Structure: {market_structure["structure"]}
-        #             {self._format_array(name="Swing high", arr=market_structure["swing_highs"], emoji="🏗️")}
-        #             {self._format_array(name="Swing low", arr=market_structure["swing_lows"], emoji="🏗️")}
-        #             {self._format_array(name="Liquidity Pools", arr=liquidity_pools, emoji="💧")}
-        #             {self._format_array(name="Order Blocks", arr=order_blocks, emoji="🧱")}
-
-        #             🎯 Bollinger Bands: {bollinger_bands}
-        #             📉 EMA 7: {ema_7[-1]}, EMA 20: {ema_20[-1]}
-        #             📊 RSI 6: {rsi_6}, RSI 12: {rsi_12}, RSI 24: {rsi_24}
-        #         """,
-        #     )
-        # )
 
         return {"result": data}
 
