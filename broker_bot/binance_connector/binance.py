@@ -18,7 +18,7 @@ BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
     api_secret=BINANCE_SECRET_KEY,
-    # base_path=BINANCE_BASE_URL,
+    base_path=BINANCE_BASE_URL,
 )
 
 # LEVERAGE = 20
@@ -28,7 +28,7 @@ configuration = ConfigurationRestAPI(
 
 LEVERAGE = 20
 ORDER_AMOUNT = 20
-EXPECTED_PROFIT = 0.35
+EXPECTED_PROFIT = 0.40
 EXPECTED_STOP_LOSS = 0.25
 
 
@@ -38,7 +38,7 @@ class BinanceConnector:
         self.positions = []
 
         self.client = DerivativesTradingUsdsFutures(config_rest_api=configuration)
-        self.get_balance()
+        # self.get_balance()
 
     def get_balance(self):
 
