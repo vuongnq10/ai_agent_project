@@ -23,12 +23,9 @@ function App() {
   }, [chatHistory]);
 
   const handleCoinClick = (coin: string) => {
-    // const query = `get indicator of ${coin} in 1-hour, 2-hour and 4-hour, analyze all provided indicators & timeframes from tool and get entry price, side of buy or sell then save the trade setup`;
-    // const query = `identify the trend of ${coin} in 4hr and 2hr timeframe, decide to enter a trade which is follow the trend or wait for better setup, then analyze the smaller timeframes to get entry price, side of buy or sell then save the trade setup`;
+    // const query = `identify the trend of ${coin} in 4hr and 2hr timeframe, identify key support and resistance levels, verify in lower timeframes for entry points, then decide to enter a trade which is follow the trend or wait for better setup`;
+    const query = `identify the trend of ${coin} in 4hr and 2hr timeframe, verify in lower timeframes for key support, resistance levels, entry points, then decide to enter a trade which is follow the trend or wait for better setup`;
 
-    const query = `identify the trend of ${coin} in 4hr and 2hr timeframe, identify key support and resistance levels, verify in lower timeframes for entry points, then decide to enter a trade which is follow the trend or wait for better setup`;
-
-    // const query = `analyze ${coin} in various timeframes, identify close order blocks, fair value gaps, key support and resistance levels, trend direction, then decide to enter a trade which is follow the trend or wait for better setup, provide entry price, side of buy or sell then save the trade setup`;
     setMessage(query);
     handleSubmit({ preventDefault: () => {} } as React.FormEvent, query);
   };

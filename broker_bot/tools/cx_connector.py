@@ -111,6 +111,7 @@ class CXConnector:
             # "rsi_24": rsi_24,
             # "ema_7": ema_7,
             # "ema_20": ema_20,
+            "current_price": self.current_price,
             "market_structure": market_structure,
             "liquidity_pools": liquidity_pools,
             "order_blocks": order_blocks,

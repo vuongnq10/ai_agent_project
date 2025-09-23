@@ -89,6 +89,7 @@ class Agent:
             config=GenerateContentConfig(
                 tools=[self.cx_connector.tools],
                 thinking_config=ThinkingConfig(include_thoughts=True),
+                # max_output_tokens=500,
             ),
         )
 
