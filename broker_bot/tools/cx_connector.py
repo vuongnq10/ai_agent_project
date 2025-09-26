@@ -9,7 +9,7 @@ from broker_bot.telegram.telegram import telegram_bot
 
 from broker_bot.binance_connector.binance import BinanceConnector
 
-binance = ccxt.binance({})
+binance = ccxt.binanceusdm({})
 binance_connector = BinanceConnector()
 
 
@@ -80,86 +80,183 @@ class CXConnector:
             ],
         )
 
-    def get_ticker(self, symbol: str, timeframe="1h"):
-        print(f"📈 Fetching ticker data for {symbol} at {timeframe} timeframe")
-        ohlcv = binance.fetch_ohlcv(symbol, timeframe, limit=100)
-
-        print(f"📈 Fetched OHLCV data for {symbol} at {timeframe} timeframe: {ohlcv}")
-        return {"result": ohlcv}
-
-    def smc_analysis(self, symbol: str, timeframe="1h", limit=100):
+    def smc_analysis_new(self, symbol: str, timeframe="1h", limit=100):
         candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
         self.current_price = candles[-1][4]
 
-        bollinger_bands = self._bollinger_bands(candles)
-        ema_7 = self._ema(candles, 7)
-        ema_20 = self._ema(candles, 20)
+        # {"open": [], "high": [], "low": [], "close": []}
+        data = self._convert_to_dict(candles)
+        atr = self._calculate_atr(data)
+        swing_points = self._find_swing_points(data, atr, lookback=5)
+        fvg = self._find_fair_value_gaps(data)
+        extremes = self._find_extremes(swing_points)
 
-        rsi_6 = self._rsi(candles, 6)
-        rsi_12 = self._rsi(candles, 12)
-        rsi_24 = self._rsi(candles, 24)
-
-        market_structure = self._calculate_market_structure(candles)
-        liquidity_pools = self._liquidity_pools(candles)
-        order_blocks = self._order_blocks(candles)
-        fair_value_gaps = self._fair_value_gaps(candles)
-
-        data = {
-            # "bollinger_bands": bollinger_bands,
-            # "rsi_6": rsi_6,
-            # "rsi_12": rsi_12,
-            # "rsi_24": rsi_24,
-            # "ema_7": ema_7,
-            # "ema_20": ema_20,
-            "current_price": self.current_price,
-            "market_structure": market_structure,
-            "liquidity_pools": liquidity_pools,
-            "order_blocks": order_blocks,
-            "fair_value_gaps": fair_value_gaps,
+        return {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "atr": atr,
+            **swing_points,
+            **extremes,
+            "fair_value_gaps": fvg,
         }
 
-        return {"result": data}
+    def _find_extremes(self, swing_points):
+        result = {}
 
-    def _format_array(self, name, arr, max_items=3, emoji="📌"):
-        """Format array/dict list into a more visual Telegram-friendly message"""
-        if not arr:
-            return f"{emoji} {name}: None"
+        # Highest swing high
+        if swing_points["swing_highs"]:
+            highest_high = max(swing_points["swing_highs"], key=lambda x: x["price"])
+            result["highest_swing_high"] = {
+                "price": highest_high["price"],
+                "at": highest_high["timestamp"],
+            }
 
-        formatted = []
-        for item in arr[:max_items]:
-            if isinstance(item, dict):
-                lines = []
-                for k, v in item.items():
-                    # Convert numpy floats
-                    if isinstance(v, (np.floating, float)):
-                        v = round(float(v), 2)
-                    # Convert timestamp if looks like ms epoch
-                    if "time" in k and isinstance(v, (int, float)) and v > 1e12:
-                        v = datetime.utcfromtimestamp(v / 1000).strftime(
-                            "%Y-%m-%d %H:%M UTC"
-                        )
-                    lines.append(f"      • {k}: {v}")
-                block = "\n".join(lines)
-                formatted.append(f"   🔹 {block}")
-            else:
-                if isinstance(item, (np.floating, float)):
-                    item = round(float(item), 2)
-                formatted.append(f"   🔹 {item}")
+        # Lowest swing low
+        if swing_points["swing_lows"]:
+            lowest_low = min(swing_points["swing_lows"], key=lambda x: x["price"])
+            result["lowest_swing_low"] = {
+                "price": lowest_low["price"],
+                "at": lowest_low["timestamp"],
+            }
 
-        if len(arr) > max_items:
-            formatted.append(f"   ... (+{len(arr) - max_items} more)")
+        return result
 
-        return f"{emoji} {name}:\n" + "\n".join(formatted)
+    def _convert_to_dict(self, data):
+        result = {"timestamp": [], "open": [], "high": [], "low": [], "close": []}
 
-    def _ema(self, candles, period=20):
-        df = pd.DataFrame(
-            candles,
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
+        for row in data:
+            # row = [time, open, high, low, close, volume]
+            result["timestamp"].append(row[0])
+            result["open"].append(row[1])
+            result["high"].append(row[2])
+            result["low"].append(row[3])
+            result["close"].append(row[4])
 
-        ema_series = df["close"].ewm(span=period, adjust=False).mean()
+        return result
 
-        return ema_series.tolist()
+    def _calculate_atr(self, data, period=5):
+        high = data["high"]
+        low = data["low"]
+        close = data["close"]
+
+        tr = []
+        for i in range(1, len(high)):
+            hl = high[i] - low[i]
+            hc = abs(high[i] - close[i - 1])
+            lc = abs(low[i] - close[i - 1])
+            tr.append(max(hl, hc, lc))
+
+        # Initial ATR = simple average of first `period` TR values
+        atr = sum(tr[:period]) / period
+
+        # Wilder’s smoothing
+        for i in range(period, len(tr)):
+            atr = (atr * (period - 1) + tr[i]) / period
+
+        return atr
+
+    def _find_swing_points(self, data, atr, lookback=5):
+        high = data["high"]
+        low = data["low"]
+        timestamp = data["timestamp"]
+
+        swing_highs = []
+        swing_lows = []
+        order_blocks = []
+
+        for i in range(1, len(high)):
+            is_high = True
+            is_low = True
+
+            # Check if current point is a swing high
+            for j in range(1, lookback + 1):
+                # Ensure index does not go out of range
+                if i - j < 0 or i + j >= len(high):
+                    is_high = False
+                    break
+                if high[i] <= high[i - j] or high[i] <= high[i + j]:
+                    is_high = False
+                    break
+
+            # Check if current point is a swing low
+            for j in range(1, lookback + 1):
+                if i - j < 0 or i + j >= len(low):
+                    is_low = False
+                    break
+                if low[i] >= low[i - j] or low[i] >= low[i + j]:
+                    is_low = False
+                    break
+
+            if is_high:
+                swing_highs.append({"timestamp": timestamp[i], "price": high[i]})
+                order_blocks.append(
+                    {
+                        "high": high[i],
+                        "low": low[i],
+                        "timestamp": timestamp[i],
+                        "type": "bearish",
+                    }
+                )
+
+            if is_low:
+                swing_lows.append({"timestamp": timestamp[i], "price": low[i]})
+                order_blocks.append(
+                    {
+                        "high": high[i],
+                        "low": low[i],
+                        "timestamp": timestamp[i],
+                        "type": "bullish",
+                    }
+                )
+
+        # Filter order blocks
+        filtered_order_blocks = [
+            ob for ob in order_blocks if ob["high"] - ob["low"] <= atr * 2
+        ]
+
+        return {
+            "swing_highs": swing_highs,
+            "swing_lows": swing_lows,
+            "order_blocks": filtered_order_blocks,
+        }
+
+    def _find_fair_value_gaps(self, data):
+        timestamps = data["timestamp"]
+        highs = data["high"]
+        lows = data["low"]
+
+        bullish_fvg = []
+        bearish_fvg = []
+
+        for i in range(len(highs) - 2):
+            high1 = highs[i]
+            low3 = lows[i + 2]
+            high3 = highs[i + 2]
+            low1 = lows[i]
+
+            # Bullish FVG: gap between candle 1 high and candle 3 low
+            if low3 > high1:
+                bullish_fvg.append(
+                    {
+                        "top": high1,
+                        "bottom": low3,
+                        "timestamps": timestamps[i],
+                        "type": "bullish",
+                    }
+                )
+
+            # Bearish FVG: gap between candle 1 low and candle 3 high
+            if low1 > high3:
+                bearish_fvg.append(
+                    {
+                        "top": low1,
+                        "bottom": high3,
+                        "timestamps": timestamps[i],
+                        "type": "bearish",
+                    }
+                )
+
+        return {"bullish": bullish_fvg, "bearish": bearish_fvg}
 
     def create_order(
         self,
@@ -183,212 +280,9 @@ class CXConnector:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    def _fair_value_gaps(self, candles):
-        df = pd.DataFrame(
-            candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
-        )
+    def get_ticker(self, symbol: str, timeframe="1h"):
+        print(f"📈 Fetching ticker data for {symbol} at {timeframe} timeframe")
+        ohlcv = binance.fetch_ohlcv(symbol, timeframe, limit=100)
 
-        gaps = []
-
-        # Loop through candle triples
-        for i in range(2, len(df)):
-            c1 = df.iloc[i - 2]
-            c2 = df.iloc[i - 1]
-            c3 = df.iloc[i]
-
-            # Bullish FVG: low of c3 > high of c1
-            if c3["low"] > c1["high"]:
-                gaps.append(
-                    {
-                        "type": "bullish",
-                        "start_index": i - 2,
-                        "end_index": i,
-                        "gap_high": c3["low"],  # top of the gap
-                        "gap_low": c1["high"],  # bottom of the gap
-                        "timestamp": int(c2["timestamp"]),
-                    }
-                )
-
-            # Bearish FVG: high of c3 < low of c1
-            elif c3["high"] < c1["low"]:
-                gaps.append(
-                    {
-                        "type": "bearish",
-                        "start_index": i - 2,
-                        "end_index": i,
-                        "gap_high": c1["low"],  # top of the gap
-                        "gap_low": c3["high"],  # bottom of the gap
-                        "timestamp": int(c2["timestamp"]),
-                    }
-                )
-
-        return gaps
-
-    def _calculate_atr(self, candles):
-        df = pd.DataFrame(
-            candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
-        )
-        tr_values = []
-        for i in range(len(df) - 1):
-            high = df["high"].iloc[i]
-            low = df["low"].iloc[i]
-            prev_close = df["close"].iloc[i + 1]
-            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
-            tr_values.append(tr)
-        return sum(tr_values) / len(tr_values) if tr_values else 0
-
-    def _calculate_market_structure(self, candles):
-        df = pd.DataFrame(
-            candles,
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-        swing_highs = []
-        swing_lows = []
-
-        for i in range(1, len(df) - 1):
-            if (
-                df["high"].iloc[i] > df["high"].iloc[i - 1]
-                and df["high"].iloc[i] > df["high"].iloc[i + 1]
-            ):
-                swing_highs.append({"price": df["high"].iloc[i], "index": i})
-            if (
-                df["low"].iloc[i] < df["low"].iloc[i - 1]
-                and df["low"].iloc[i] < df["low"].iloc[i + 1]
-            ):
-                swing_lows.append({"price": df["low"].iloc[i], "index": i})
-
-        structure = "UNDEFINED"
-        if len(swing_highs) >= 2 and len(swing_lows) >= 2:
-            recent_highs = swing_highs[:2]
-            recent_lows = swing_lows[:2]
-            higher_highs = recent_highs[0]["price"] > recent_highs[1]["price"]
-            higher_lows = recent_lows[0]["price"] > recent_lows[1]["price"]
-            if higher_highs and higher_lows:
-                structure = "BULLISH_TREND"
-            elif not higher_highs and not higher_lows:
-                structure = "BEARISH_TREND"
-            elif higher_highs and not higher_lows:
-                structure = "BULLISH_BREAKOUT"
-            elif not higher_highs and higher_lows:
-                structure = "BEARISH_BREAKOUT"
-            else:
-                structure = "CONSOLIDATION"
-
-        return {
-            "structure": structure,
-            "swing_highs": swing_highs,
-            "swing_lows": swing_lows,
-        }
-
-    def _bollinger_bands(self, candles, period=20, multiplier=2):
-        data_frame = pd.DataFrame(
-            candles[-period:],
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-
-        data_frame["sma"] = data_frame["close"].rolling(window=period).mean()
-        data_frame["std"] = data_frame["close"].rolling(window=period).std()
-
-        data_frame["upper_band"] = data_frame["sma"] + (multiplier * data_frame["std"])
-        data_frame["lower_band"] = data_frame["sma"] - (multiplier * data_frame["std"])
-
-        return {
-            "upper_band": data_frame["upper_band"].iloc[-1],
-            "lower_band": data_frame["lower_band"].iloc[-1],
-            "sma": data_frame["sma"].iloc[-1],
-        }
-
-    def _rsi(self, candles, period=14):
-        data_frame = pd.DataFrame(
-            candles[-period:],
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-
-        delta = data_frame["close"].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-
-        return rsi.iloc[-1]
-
-    def _liquidity_pools(self, candles):
-        df = pd.DataFrame(
-            candles,
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-        avg_volume = df["volume"].mean()
-        high_volume_threshold = avg_volume * 1.5
-        pools = []
-
-        for i in range(1, len(df) - 1):
-            if df["volume"].iloc[i] > high_volume_threshold:
-                if (
-                    df["low"].iloc[i] < df["low"].iloc[i - 1]
-                    and df["low"].iloc[i] < df["low"].iloc[i + 1]
-                ):
-                    pools.append(
-                        {
-                            "type": "DEMAND",
-                            "price": df["low"].iloc[i],
-                            "volume": df["volume"].iloc[i],
-                            "strength": df["volume"].iloc[i] / avg_volume,
-                        }
-                    )
-                elif (
-                    df["high"].iloc[i] > df["high"].iloc[i - 1]
-                    and df["high"].iloc[i] > df["high"].iloc[i + 1]
-                ):
-                    pools.append(
-                        {
-                            "type": "SUPPLY",
-                            "price": df["high"].iloc[i],
-                            "volume": df["volume"].iloc[i],
-                            "strength": df["volume"].iloc[i] / avg_volume,
-                        }
-                    )
-
-        return sorted(pools, key=lambda x: x["strength"], reverse=True)[:3]
-
-    def _order_blocks(self, candles):
-        df = pd.DataFrame(
-            candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
-        )
-        avg_volume = df["volume"].mean()
-        order_blocks = []
-
-        for i in range(1, len(df) - 1):
-            current_candle = df.iloc[i]
-            next_candle = df.iloc[i - 1]
-            if current_candle["volume"] > avg_volume * 1.5:
-                price_change = (
-                    (next_candle["close"] - current_candle["close"])
-                    / current_candle["close"]
-                ) * 100
-                if (
-                    price_change > 1.0
-                    and current_candle["close"] > current_candle["open"]
-                ):
-                    order_blocks.append(
-                        {
-                            "type": "BULLISH",
-                            "price": current_candle["close"],
-                            "volume": current_candle["volume"],
-                            "strength": abs(price_change),
-                        }
-                    )
-                elif (
-                    price_change < -1.0
-                    and current_candle["close"] < current_candle["open"]
-                ):
-                    order_blocks.append(
-                        {
-                            "type": "BEARISH",
-                            "price": current_candle["close"],
-                            "volume": current_candle["volume"],
-                            "strength": abs(price_change),
-                        }
-                    )
-
-        return sorted(order_blocks, key=lambda x: x["strength"], reverse=True)[:3]
+        print(f"📈 Fetched OHLCV data for {symbol} at {timeframe} timeframe: {ohlcv}")
+        return {"result": ohlcv}

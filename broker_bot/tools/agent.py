@@ -69,6 +69,7 @@ class Agent:
             - Consider for all timeframes.
             - Decide to wait or enter a trade based on the analysis.
             - It's not required to enter a trade immediately, you can suggest to wait for a better setup.
+            - Evaluate the confidence of your analysis and state it in percentage then decide to enter a trade or wait.
             \n\n User request: {state["user_prompt"]}
             """
 

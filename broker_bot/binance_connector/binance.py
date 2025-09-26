@@ -13,7 +13,7 @@ from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futur
 
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
-BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
+# BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
 
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
@@ -27,7 +27,7 @@ configuration = ConfigurationRestAPI(
 # EXPECTED_STOP_LOSS = 2
 
 LEVERAGE = 20
-ORDER_AMOUNT = 30
+ORDER_AMOUNT = 15
 EXPECTED_PROFIT = 0.40
 EXPECTED_STOP_LOSS = 0.25
 
