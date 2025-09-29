@@ -80,7 +80,7 @@ class CXConnector:
             ],
         )
 
-    def smc_analysis_new(self, symbol: str, timeframe="1h", limit=100):
+    def smc_analysis(self, symbol: str, timeframe="1h", limit=100):
         candles = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
         self.current_price = candles[-1][4]
 
@@ -92,6 +92,7 @@ class CXConnector:
         extremes = self._find_extremes(swing_points)
 
         return {
+            "candles": candles,
             "symbol": symbol,
             "timeframe": timeframe,
             "atr": atr,

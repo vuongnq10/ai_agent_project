@@ -164,11 +164,11 @@ class Agent:
                     tool_responses.append(function_response)
 
         if tool_responses:
-            function_response_parts = []
-            for tool_response in tool_responses:
-                function_response_parts.append(tool_response)
+            # function_response_parts = []
+            # for tool_response in tool_responses:
+            #     function_response_parts.append(tool_response)
 
-            tool_content = Content(role="user", parts=function_response_parts)
+            tool_content = Content(role="user", parts=tool_responses)
             state["messages"].append(tool_content)
 
         return state

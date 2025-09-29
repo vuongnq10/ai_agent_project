@@ -6,9 +6,11 @@ from langgraph.graph import StateGraph, END, START
 from google.genai.types import Content, Part
 
 from master_agent.agents.agent import Agent
+from master_agent.agents.tool_agent import ToolAgent
 
 memory = InMemorySaver()
 agent = Agent()
+tool_agent = ToolAgent()
 
 
 class MasterState(TypedDict):
@@ -27,6 +29,7 @@ class MasterAgent:
         workflow = StateGraph(MasterState)
 
         workflow.add_node("chatbot", self._call_master)
+        workflow.add_node("data_agent", self._tool_agent)
         workflow.add_node("generate_response", self._generate_response_node)
 
         workflow.set_entry_point("chatbot")
@@ -53,16 +56,8 @@ class MasterAgent:
             ... additional relevant details ...
         }
         """
-        # move this part to Agent class later
-        contents = [
-            Content(
-                role="user",
-                parts=[
-                    Part.from_text(text=f"{system_prompt}\n\nUser prompt: {prompt}")
-                ],
-            )
-        ]
-        intent = agent(contents=contents)
+
+        intent = agent(prompt=f"{system_prompt}\n\nUser prompt: {prompt}")
         state["intent"] = intent
 
         state["step_count"] = state.get("step_count", 0) + 1
@@ -77,6 +72,11 @@ class MasterAgent:
         }
 
         return switcher.get(response_state, "general_agent")
+
+    def _tool_agent(self, state: MasterState):
+
+        state["step_count"] = state.get("step_count", 0) + 1
+        return state
 
     def _generate_response_node(self, state: MasterState):
         return state
