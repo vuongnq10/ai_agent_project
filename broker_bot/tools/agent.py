@@ -90,7 +90,9 @@ class Agent:
             config=GenerateContentConfig(
                 tools=[self.cx_connector.tools],
                 thinking_config=ThinkingConfig(include_thoughts=True),
-                # max_output_tokens=500,
+                # max_output_tokens=150,
+                temperature=0.2,
+                seed=42,
             ),
         )
 
@@ -164,10 +166,6 @@ class Agent:
                     tool_responses.append(function_response)
 
         if tool_responses:
-            # function_response_parts = []
-            # for tool_response in tool_responses:
-            #     function_response_parts.append(tool_response)
-
             tool_content = Content(role="user", parts=tool_responses)
             state["messages"].append(tool_content)
 
