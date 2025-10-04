@@ -15,13 +15,13 @@ client = Client(api_key=API_KEY, http_options=HttpOptions(api_version="v1alpha")
 
 
 class Agent:
-    def __call__(self, prompt, tools=None):
-        contents = [
-            Content(
-                role="user",
-                parts=[Part.from_text(text=f"{prompt}\n\nUser prompt: {prompt}")],
-            )
-        ]
+    def __call__(self, contents, tools=None):
+        # contents = [
+        #     Content(
+        #         role="user",
+        #         parts=[Part.from_text(text=f"{prompt}\n\nUser prompt: {prompt}")],
+        #     )
+        # ]
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=contents,
