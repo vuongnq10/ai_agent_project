@@ -2,7 +2,7 @@ import time
 import json
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 
-from master_agent.agents.master import MasterAgent
+from master_agent.agents_gemini.agentic_agent import MasterAgent
 
 master_agent = MasterAgent()
 

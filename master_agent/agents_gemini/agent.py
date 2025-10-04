@@ -28,6 +28,8 @@ class Agent:
             config=GenerateContentConfig(
                 tools=tools,
                 thinking_config=ThinkingConfig(include_thoughts=True),
+                temperature=0.2,
+                seed=42,
             ),
         )
         return response

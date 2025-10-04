@@ -7,7 +7,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END, START
 from google.genai.types import Content, Part
 
-from master_agent.agents.agent import Agent
+from master_agent.agents_gemini.agent import Agent
 
 # from master_agent.agents.tool_agent import ToolAgent
 # from master_agent.agents.analyse_agent import AnalyseAgent
