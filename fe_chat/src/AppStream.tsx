@@ -65,6 +65,12 @@ function App() {
         eventSource.close();
         setLoading(false);
       });
+
+      eventSource.onerror = (error) => {
+        console.error("EventSource error:", error);
+        eventSource.close();
+        setLoading(false);
+      };
     } catch (error) {
       console.error("Error setting up EventSource:", error);
       const errorMessage = {
@@ -221,6 +227,24 @@ function App() {
                   </div>
                 </div>
               ))
+            )}
+            {loading && (
+              <div className="loading-indicator">
+                <div className="loading-spinner">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="animate-spin"
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                </div>
+                <span className="loading-text">AI is thinking...</span>
+              </div>
             )}
           </div>
 

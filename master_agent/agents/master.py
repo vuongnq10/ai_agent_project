@@ -199,105 +199,116 @@ class MasterAgent:
         return state
 
     def _tool_agent(self, state: MasterState):
-        state["user_feedback"] = "# Tool Agent Processing: " + str(state["step_count"])
-        contents = state["chat_history"]
-
-        response = agent(contents, tools=[cx_connector.tools])
-
-        print("Tool Agent response:", response)
-        print("*" * 20)
-
-        serialized = self._proceed_reponse(response)
-        if serialized["thought"]:
-            state["user_feedback"] = serialized["thought"]
-        if serialized["agent_response"]:
-            state["agent_response"] = serialized["agent_response"]
-            state["chat_history"].append(
-                Content(
-                    role="user",
-                    parts=[Part.from_text(text=serialized["agent_response"])],
-                )
+        try:
+            state["user_feedback"] = "# Tool Agent Processing: " + str(
+                state["step_count"]
             )
-        else:
-            state["agent_response"] = ""
+            contents = state["chat_history"]
 
-        if response.candidates[0]:
-            parts = response.candidates[0].content.parts
-            for part in parts:
-                if hasattr(part, "function_call") and part.function_call:
-                    func_call = part.function_call
-                    tool_name = func_call.name
-                    args = dict(func_call.args)
+            response = agent(contents, tools=[cx_connector.tools])
 
-                    tool_func = getattr(cx_connector, tool_name)
-                    tool_result = tool_func(**args)
-                    function_response = Part.from_function_response(
-                        name=tool_name,
-                        response=tool_result,
+            print("Tool Agent response:", response)
+            print("*" * 20)
+
+            serialized = self._proceed_reponse(response)
+            if serialized["thought"]:
+                state["user_feedback"] = serialized["thought"]
+            if serialized["agent_response"]:
+                state["agent_response"] = serialized["agent_response"]
+                state["chat_history"].append(
+                    Content(
+                        role="user",
+                        parts=[Part.from_text(text=serialized["agent_response"])],
                     )
+                )
+            else:
+                state["agent_response"] = ""
 
-                    state["chat_history"].append(
-                        Content(role="user", parts=[function_response])
-                    )
+            if response.candidates[0]:
+                parts = response.candidates[0].content.parts
+                for part in parts:
+                    if hasattr(part, "function_call") and part.function_call:
+                        func_call = part.function_call
+                        tool_name = func_call.name
+                        args = dict(func_call.args)
 
-        state["step_count"] += 1
-        return state
+                        tool_func = getattr(cx_connector, tool_name)
+                        tool_result = tool_func(**args)
+                        function_response = Part.from_function_response(
+                            name=tool_name,
+                            response=tool_result,
+                        )
+
+                        state["chat_history"].append(
+                            Content(role="user", parts=[function_response])
+                        )
+
+            state["step_count"] += 1
+            return state
+        except Exception as e:
+            print(f"Error loading tools: {e}")
 
     def _analyse_agent(self, state: MasterState):
-        state["user_feedback"] = "# Analyse Agent Processing: " + str(
-            state["step_count"]
-        )
-        contents = state["chat_history"]
-
-        response = agent(contents)
-
-        print("Analyse Agent response:", response)
-        print("*" * 20)
-
-        serialized = self._proceed_reponse(response)
-
-        if serialized["thought"]:
-            state["user_feedback"] = serialized["thought"]
-
-        if serialized["agent_response"]:
-            state["agent_response"] = serialized["agent_response"]
-            state["chat_history"].append(
-                Content(
-                    role="user",
-                    parts=[Part.from_text(text=serialized["agent_response"])],
-                )
+        try:
+            state["user_feedback"] = "# Analyse Agent Processing: " + str(
+                state["step_count"]
             )
+            contents = state["chat_history"]
 
-        state["step_count"] += 1
-        return state
+            response = agent(contents)
+
+            print("Analyse Agent response:", response)
+            print("*" * 20)
+
+            serialized = self._proceed_reponse(response)
+
+            if serialized["thought"]:
+                state["user_feedback"] = serialized["thought"]
+
+            if serialized["agent_response"]:
+                state["agent_response"] = serialized["agent_response"]
+                state["chat_history"].append(
+                    Content(
+                        role="user",
+                        parts=[Part.from_text(text=serialized["agent_response"])],
+                    )
+                )
+
+            state["step_count"] += 1
+            return state
+        except Exception as e:
+            print(f"Error in Analyse Agent: {e}")
 
     def _decision_agent(self, state: MasterState):
-        state["user_feedback"] = "# Decistion Agent Processing: " + str(
-            state["step_count"]
-        )
-        contents = state["chat_history"]
-
-        response = agent(contents)
-
-        print("Decision Agent response:", response)
-        print("*" * 20)
-
-        serialized = self._proceed_reponse(response)
-
-        if serialized["thought"]:
-            state["user_feedback"] = serialized["thought"]
-
-        if serialized["agent_response"]:
-            state["agent_response"] = serialized["agent_response"]
-            state["chat_history"].append(
-                Content(
-                    role="user",
-                    parts=[Part.from_text(text=serialized["agent_response"])],
-                )
+        try:
+            state["user_feedback"] = "# Decistion Agent Processing: " + str(
+                state["step_count"]
             )
+            contents = state["chat_history"]
 
-        state["step_count"] += 1
-        return state
+            response = agent(contents)
+
+            print("Decision Agent response:", response)
+            print("*" * 20)
+
+            serialized = self._proceed_reponse(response)
+
+            if serialized["thought"]:
+                state["user_feedback"] = serialized["thought"]
+
+            if serialized["agent_response"]:
+                state["agent_response"] = serialized["agent_response"]
+                state["chat_history"].append(
+                    Content(
+                        role="user",
+                        parts=[Part.from_text(text=serialized["agent_response"])],
+                    )
+                )
+
+            state["step_count"] += 1
+            return state
+        except Exception as e:
+            print(f"Error in Decision Agent: {e}")
 
     def _generate_response(self, state: MasterState):
         return state
@@ -316,29 +327,8 @@ class MasterAgent:
                 thought = part.text
 
         return {
-            "thought": thought,
+            "thought": str(thought),
             "agent_response": agent_response,
-        }
-
-    def _proceed_reponse_1111(self, response):
-        agent_response = ""
-        thought = ""
-
-        if not response.candidates or not response.candidates[0].content:
-            return {"thought": "", "agent_response": ""}
-
-        parts = response.candidates[0].content.parts
-
-        for part in parts:
-            if hasattr(part, "text") and isinstance(part.text, str):
-                agent_response += part.text
-
-            if hasattr(part, "thought") and isinstance(part.thought, str):
-                thought += part.thought.strip() + " "
-
-        return {
-            "thought": thought.strip(),
-            "agent_response": agent_response.strip(),
         }
 
     def __call__(self, prompt: str, session_id="default_session"):
@@ -356,7 +346,13 @@ class MasterAgent:
 
         for event in events:
             try:
-                if event["user_feedback"]:
+                print("Event:", event)
+                if event.get("user_feedback"):
+
+                    print("#" * 20)
+                    print(event["user_feedback"])
+                    print("#" * 20)
+
                     response_text = (
                         event["user_feedback"] + "\n *********************** \n"
                     )
