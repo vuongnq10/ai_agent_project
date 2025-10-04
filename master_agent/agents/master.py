@@ -81,6 +81,7 @@ class MasterAgent:
             self._routing,
             {
                 "tools_agent": "tools_agent",
+                "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",
                 "master_agent": "master_agent",
                 "generate_response": "generate_response",
@@ -93,6 +94,7 @@ class MasterAgent:
             {
                 "tools_agent": "tools_agent",
                 "analysis_agent": "analysis_agent",
+                "decision_agent": "decision_agent",
                 "master_agent": "master_agent",
                 "generate_response": "generate_response",
             },
@@ -125,6 +127,9 @@ class MasterAgent:
             "FINAL_RESPONSE": "generate_response",
         }
 
+        if state["step_count"] >= state["max_steps"]:
+            state["user_feedback"] = "# Max steps reached, generating final response."
+            return "generate_response"
         return switcher.get(type_value, "master_agent")
 
     def _init_flow(self, state: MasterState):
@@ -157,7 +162,6 @@ class MasterAgent:
                 }
                 """
             contents = [
-                # Content(role="system", parts=[Part.from_text(text=system_prompt)]),
                 Content(
                     role="user",
                     parts=[
@@ -311,6 +315,7 @@ class MasterAgent:
             print(f"Error in Decision Agent: {e}")
 
     def _generate_response(self, state: MasterState):
+        state["user_feedback"] = ""
         return state
 
     def _proceed_reponse(self, response):
@@ -324,7 +329,7 @@ class MasterAgent:
 
         for part in parts:
             if hasattr(part, "thought") and part.thought:
-                thought = part.text
+                thought = part.text.rstrip()
 
         return {
             "thought": str(thought),
@@ -337,7 +342,7 @@ class MasterAgent:
             "chat_history": [],
             "user_prompt": prompt,
             "step_count": 0,
-            "max_steps": 20,
+            "max_steps": 10,
             "user_feedback": "",
         }
         config = {"configurable": {"thread_id": session_id}}
@@ -359,3 +364,4 @@ class MasterAgent:
                     yield response_text
             except Exception as e:
                 print(f"Error in streaming: {e}")
+                yield f"Error in streaming: {e}"
