@@ -152,6 +152,15 @@ class MasterAgent:
                 - GENERAL_QUERY: Generate the result of the prompt.
                 - FINAL_RESPONSE: Provide the final response to the user based on the analysis and decisions made by other agents.
 
+                Steps to follow:
+                1. Get the data and indicators using TOOL_AGENT if needed.
+                2. Analyze the market using MARKET_ANALYSIS if needed.
+                3. Analyze again if needed.
+                4. TOOL_AGENT can be called again if needed.
+                5. Make a trade decision using TRADE_DECISION once analysis is sufficient.
+                6. If decide to trade, use TOOL_AGENT to create the trade setup.
+                7. If no trade is to be made, respond with GENERAL_QUERY or FINAL_RESPONSE
+
                 Respond in JSON format:
                 {
                     "type": "CATEGORY", // One of the above categories
