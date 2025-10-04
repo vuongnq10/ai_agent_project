@@ -72,6 +72,7 @@ class MasterAgent:
                 "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",
                 "master_agent": "master_agent",
+                "generate_response": "generate_response",
             },
         )
 
@@ -82,6 +83,7 @@ class MasterAgent:
                 "tools_agent": "tools_agent",
                 "decision_agent": "decision_agent",
                 "master_agent": "master_agent",
+                "generate_response": "generate_response",
             },
         )
 
@@ -92,6 +94,7 @@ class MasterAgent:
                 "tools_agent": "tools_agent",
                 "analysis_agent": "analysis_agent",
                 "master_agent": "master_agent",
+                "generate_response": "generate_response",
             },
         )
 
@@ -115,7 +118,7 @@ class MasterAgent:
         type_value = data_obj.get("type", "GENERAL_QUERY")
 
         switcher = {
-            "GET_DATA_AND_INDICATORS": "tools_agent",
+            "TOOL_AGENT": "tools_agent",
             "MARKET_ANALYSIS": "analysis_agent",
             "TRADE_DECISION": "decision_agent",
             "GENERAL_QUERY": "master_agent",
@@ -137,10 +140,11 @@ class MasterAgent:
                 You are a Master Agent in Agentic AI assistant that analyzes user prompts for cryptocurrency trading intentions.
                 
                 Classify the user's request into one of these categories:
-                - GET_DATA_AND_INDICATORS: Tools Agent to fetch market data and compute indicators and place orders
-                - MARKET_ANALYSIS: Analyse Agent market conditions based on data and indicators
-                - TRADE_DECISION: Decision Agent to buy/sell or wait based on analysis
-                - GENERAL_QUERY: Generate the result of the prompt
+                - TOOL_AGENT: Tools Agent to get market data and indicators.
+                - TOOL_AGENT: Tools Agent to create the trade setup based on analysis and decision.
+                - MARKET_ANALYSIS: Analyse Agent market conditions based on data and indicators.
+                - TRADE_DECISION: Decision Agent to buy/sell or wait based on analysis.
+                - GENERAL_QUERY: Generate the result of the prompt.
                 - FINAL_RESPONSE: Provide the final response to the user based on the analysis and decisions made by other agents.
 
                 Respond in JSON format:
@@ -173,6 +177,10 @@ class MasterAgent:
             state["chat_history"] = contents
 
         response = agent(contents)
+
+        print("Master Agent response:", response)
+        print("*" * 20)
+
         serialized = self._proceed_reponse(response)
 
         if serialized["thought"]:
@@ -195,6 +203,9 @@ class MasterAgent:
         contents = state["chat_history"]
 
         response = agent(contents, tools=[cx_connector.tools])
+
+        print("Tool Agent response:", response)
+        print("*" * 20)
 
         serialized = self._proceed_reponse(response)
         if serialized["thought"]:
@@ -239,6 +250,10 @@ class MasterAgent:
         contents = state["chat_history"]
 
         response = agent(contents)
+
+        print("Analyse Agent response:", response)
+        print("*" * 20)
+
         serialized = self._proceed_reponse(response)
 
         if serialized["thought"]:
@@ -263,6 +278,10 @@ class MasterAgent:
         contents = state["chat_history"]
 
         response = agent(contents)
+
+        print("Decision Agent response:", response)
+        print("*" * 20)
+
         serialized = self._proceed_reponse(response)
 
         if serialized["thought"]:
@@ -286,8 +305,12 @@ class MasterAgent:
     def _proceed_reponse(self, response):
         parts = response.candidates[0].content.parts
 
-        agent_response = response.text
+        agent_response = ""
         thought = ""
+
+        if hasattr(response, "text"):
+            agent_response = response.text
+
         for part in parts:
             if hasattr(part, "thought") and part.thought:
                 thought = part.text
@@ -295,6 +318,27 @@ class MasterAgent:
         return {
             "thought": thought,
             "agent_response": agent_response,
+        }
+
+    def _proceed_reponse_1111(self, response):
+        agent_response = ""
+        thought = ""
+
+        if not response.candidates or not response.candidates[0].content:
+            return {"thought": "", "agent_response": ""}
+
+        parts = response.candidates[0].content.parts
+
+        for part in parts:
+            if hasattr(part, "text") and isinstance(part.text, str):
+                agent_response += part.text
+
+            if hasattr(part, "thought") and isinstance(part.thought, str):
+                thought += part.thought.strip() + " "
+
+        return {
+            "thought": thought.strip(),
+            "agent_response": agent_response.strip(),
         }
 
     def __call__(self, prompt: str, session_id="default_session"):

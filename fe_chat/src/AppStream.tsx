@@ -23,7 +23,7 @@ function App() {
   }, [chatHistory]);
 
   const handleCoinClick = (coin: string) => {
-    const query = `get indicators of ${coin} in 1-hour, 2-hour and 4-hour, analyze all provided indicators from tool and get entry price, side of buy or sell then save the trade setup`;
+    const query = `identify the trend of ${coin} in 4hr and 2hr timeframe, verify in lower timeframes for key support, resistance levels, entry points, then decide to enter a trade which is follow the trend or wait for better setup`;
     setMessage(query);
     handleSubmit({ preventDefault: () => {} } as React.FormEvent, query);
   };
