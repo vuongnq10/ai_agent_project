@@ -40,7 +40,7 @@ function App() {
 
     try {
       const eventSource = new EventSource(
-        `http://127.0.0.1:8000/master_agent?query=${encodeURIComponent(
+        `http://127.0.0.1:8000/master_agent/open_ai?query=${encodeURIComponent(
           messageToSend
         )}`
       );

@@ -32,7 +32,7 @@ class MasterState(TypedDict):
     user_feedback: str
 
 
-class MasterAgent:
+class MasterGemini:
     def __init__(self):
         self.graph = self._build_graph()
 

@@ -2,19 +2,19 @@ import time
 import json
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 
-from master_agent.agents_gemini.agentic_agent import MasterAgent
+from master_agent.agents_gemini.agentic_agent import MasterGemini
 
-master_agent = MasterAgent()
+master_gemini = MasterGemini()
 
 
-def chat(request):
+def chat_gemini(request):
     user_message = request.GET.get("query")
 
     print("User message:", user_message)
 
     def event_stream():
         try:
-            for chunk in master_agent(user_message):
+            for chunk in master_gemini(user_message):
                 for line in chunk.splitlines(keepends=True):
                     for char in line:
                         payload = {"character": char}
@@ -28,3 +28,7 @@ def chat(request):
             yield f"data: Error: {str(e)}\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
+
+def chat_openai(request):
+    return HttpResponse("OpenAI endpoint")
