@@ -9,3 +9,4 @@ ccxt
 uvicorn
 pandas
 binance-sdk-derivatives-trading-usds-futures
+openai==2.1.0
