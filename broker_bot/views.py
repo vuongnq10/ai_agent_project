@@ -10,6 +10,7 @@ import time
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 from broker_bot.tools.agent import Agent
 from broker_bot.telegram.telegram import telegram_bot
+from broker_bot.tools.cx_connector import CXConnector
 
 agent = Agent()
 
@@ -84,3 +85,9 @@ def telegram_notify(request):
         return JsonResponse({"success": True, "response": response})
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)})
+
+
+def test_cx(request):
+    cx = CXConnector()
+    indicators = cx.smc_analysis("TIA/USDT", "4h", 100)
+    return JsonResponse({"success": True, "data": indicators})

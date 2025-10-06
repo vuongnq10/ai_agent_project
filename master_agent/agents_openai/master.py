@@ -2,11 +2,12 @@ from typing_extensions import TypedDict
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END
+from master_agent.agents_openai.openai import OpenAIAgent
 
 # from openai import OpenAI
 
 memory = InMemorySaver()
-# client = OpenAI()
+open_ai = OpenAIAgent()
 
 
 class MasterState(TypedDict):
@@ -63,13 +64,14 @@ class MasterOpenAI:
     def _master(self, state: MasterState):
         user_prompt = state["user_prompt"]
 
-        # open AI call
-        state["user_feedback"] = "## Master Agent Response - Open AI\n"
+        response = open_ai(user_prompt)
+
+        state["user_feedback"] = response.output_text
         state["next_step"] = "FINAL_RESPONSE"
         return state
 
     def _finalize_flow(self, state: MasterState):
-        state["user_feedback"] = "## Final Response - Open AI\n"
+        state["user_feedback"] = ""
         return state
 
     def __call__(self, prompt: str, session_id="default_session"):

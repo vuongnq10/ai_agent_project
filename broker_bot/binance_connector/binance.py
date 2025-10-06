@@ -27,9 +27,9 @@ configuration = ConfigurationRestAPI(
 # EXPECTED_STOP_LOSS = 2
 
 LEVERAGE = 20
-ORDER_AMOUNT = 12
-EXPECTED_PROFIT = 0.25
-EXPECTED_STOP_LOSS = 0.15
+ORDER_AMOUNT = 10
+EXPECTED_PROFIT = 0.5
+EXPECTED_STOP_LOSS = 0.5
 
 
 class BinanceConnector:
@@ -38,7 +38,7 @@ class BinanceConnector:
         self.positions = []
 
         self.client = DerivativesTradingUsdsFutures(config_rest_api=configuration)
-        self.get_balance()
+        # self.get_balance()
 
     def get_balance(self):
 

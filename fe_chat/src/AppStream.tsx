@@ -23,7 +23,7 @@ function App() {
   }, [chatHistory]);
 
   const handleCoinClick = (coin: string) => {
-    const query = `identify the trend of ${coin} in 4hr and 2hr timeframe, verify in lower timeframes for key support, resistance levels, entry points, then decide to enter a trade which is follow the trend or wait for better setup`;
+    const query = `identify the trend of ${coin} in 2hr and lower timeframes, verify in lower timeframes for key support, resistance levels, entry points and others indicators, then decide to enter a trade which is follow the trend or wait for better setup`;
     setMessage(query);
     handleSubmit({ preventDefault: () => {} } as React.FormEvent, query);
   };
@@ -40,7 +40,7 @@ function App() {
 
     try {
       const eventSource = new EventSource(
-        `http://127.0.0.1:8000/master_agent/open_ai?query=${encodeURIComponent(
+        `http://127.0.0.1:8000/master_agent?query=${encodeURIComponent(
           messageToSend
         )}`
       );

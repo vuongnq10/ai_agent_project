@@ -91,8 +91,8 @@ class CXConnector:
         fvg = self._find_fair_value_gaps(data)
         extremes = self._find_extremes(swing_points)
 
-        return {
-            "candles": candles,
+        indicators = {
+            # "candles": candles,
             "symbol": symbol,
             "timeframe": timeframe,
             "atr": atr,
@@ -100,6 +100,7 @@ class CXConnector:
             **extremes,
             "fair_value_gaps": fvg,
         }
+        return indicators
 
     def _find_extremes(self, swing_points):
         result = {}
