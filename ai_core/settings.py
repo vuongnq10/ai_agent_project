@@ -68,7 +68,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "broker_bot",
-    "tech_implement",
     "master_agent",
     "corsheaders",
 ]

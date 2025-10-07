@@ -23,7 +23,7 @@ function App() {
   }, [chatHistory]);
 
   const handleCoinClick = (coin: string) => {
-    const query = `identify the trend of ${coin} in 2hr and lower timeframes, verify in lower timeframes for key support, resistance levels, entry points and others indicators, then decide to enter a trade which is follow the trend or wait for better setup`;
+    const query = `identify the trend of ${coin} in 2hr and lower timeframes, verify in lower timeframes for key support, resistance levels, entry points and others indicators, find the strongest demand and supply zones, determine the trade setup which align with the trend and close to the key levels or waiting for better setup`;
     setMessage(query);
     handleSubmit({ preventDefault: () => {} } as React.FormEvent, query);
   };

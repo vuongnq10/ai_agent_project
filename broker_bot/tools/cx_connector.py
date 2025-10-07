@@ -90,6 +90,19 @@ class CXConnector:
         swing_points = self._find_swing_points(data, atr, lookback=5)
         fvg = self._find_fair_value_gaps(data)
         extremes = self._find_extremes(swing_points)
+        break_of_structure = self._break_of_structure(data, swing_points)
+        changes_of_character = self._changes_of_character(data, swing_points)
+
+        bollinger_bands_14 = self._bollinger_bands(candles, period=14, multiplier=2)
+        bollinger_bands_20 = self._bollinger_bands(candles, period=20, multiplier=2)
+        bollinger_bands_50 = self._bollinger_bands(candles, period=50, multiplier=2.5)
+        ema_9 = self._ema(candles, 9)
+        ema_20 = self._ema(candles, 20)
+        ema_50 = self._ema(candles, 50)
+
+        rsi_7 = self._rsi(candles, 7)
+        rsi_14 = self._rsi(candles, 14)
+        rsi_21 = self._rsi(candles, 21)
 
         indicators = {
             # "candles": candles,
@@ -99,6 +112,15 @@ class CXConnector:
             **swing_points,
             **extremes,
             "fair_value_gaps": fvg,
+            "break_of_structure": break_of_structure,
+            "changes_of_character": changes_of_character,
+            "bollinger_bands": {
+                "14": bollinger_bands_14,
+                "20": bollinger_bands_20,
+                "50": bollinger_bands_50,
+            },
+            "ema": {"9": ema_9, "20": ema_20, "50": ema_50},
+            "rsi": {"7": rsi_7, "14": rsi_14, "21": rsi_21},
         }
         return indicators
 
@@ -222,6 +244,97 @@ class CXConnector:
             "order_blocks": filtered_order_blocks,
         }
 
+    def _break_of_structure(self, data, swing_points):
+        closes = data["close"]
+        timestamps = data["timestamp"]
+
+        swing_highs = sorted(swing_points["swing_highs"], key=lambda x: x["timestamp"])
+        swing_lows = sorted(swing_points["swing_lows"], key=lambda x: x["timestamp"])
+
+        bos_points = []
+
+        last_swing_high = None
+        last_swing_low = None
+
+        for i in range(1, len(closes)):
+            t = timestamps[i]
+            c = closes[i]
+
+            # Update last swings
+            if swing_highs and t > swing_highs[0]["timestamp"]:
+                last_swing_high = swing_highs.pop(0)
+            if swing_lows and t > swing_lows[0]["timestamp"]:
+                last_swing_low = swing_lows.pop(0)
+
+            # Check bullish BOS
+            if last_swing_high and c > last_swing_high["price"]:
+                bos_points.append({"type": "BOS_bullish", "timestamp": t, "price": c})
+                last_swing_high = None  # Prevent duplicate BOS
+
+            # Check bearish BOS
+            if last_swing_low and c < last_swing_low["price"]:
+                bos_points.append({"type": "BOS_bearish", "timestamp": t, "price": c})
+                last_swing_low = None
+
+        return bos_points
+
+    def _changes_of_character(self, data, swing_points):
+        closes = data["close"]
+        timestamps = data["timestamp"]
+
+        swing_highs = sorted(swing_points["swing_highs"], key=lambda x: x["timestamp"])
+        swing_lows = sorted(swing_points["swing_lows"], key=lambda x: x["timestamp"])
+
+        choc_points = []
+
+        # Determine initial structure (bullish or bearish)
+        structure = None
+        if len(swing_highs) >= 2 and len(swing_lows) >= 2:
+            if (
+                swing_highs[1]["price"] > swing_highs[0]["price"]
+                and swing_lows[1]["price"] > swing_lows[0]["price"]
+            ):
+                structure = "bullish"
+            elif (
+                swing_highs[1]["price"] < swing_highs[0]["price"]
+                and swing_lows[1]["price"] < swing_lows[0]["price"]
+            ):
+                structure = "bearish"
+
+        last_swing_high = None
+        last_swing_low = None
+
+        for i in range(1, len(closes)):
+            t = timestamps[i]
+            c = closes[i]
+
+            if swing_highs and t > swing_highs[0]["timestamp"]:
+                last_swing_high = swing_highs.pop(0)
+            if swing_lows and t > swing_lows[0]["timestamp"]:
+                last_swing_low = swing_lows.pop(0)
+
+            if (
+                structure == "bearish"
+                and last_swing_high
+                and c > last_swing_high["price"]
+            ):
+                choc_points.append(
+                    {"type": "CHoCH_bullish", "timestamp": t, "price": c}
+                )
+                structure = "bullish"
+
+            elif (
+                structure == "bullish"
+                and last_swing_low
+                and c < last_swing_low["price"]
+            ):
+                choc_points.append(
+                    {"type": "CHoCH_bearish", "timestamp": t, "price": c}
+                )
+                structure = "bearish"
+
+        return choc_points
+
     def _find_fair_value_gaps(self, data):
         timestamps = data["timestamp"]
         highs = data["high"]
@@ -259,6 +372,69 @@ class CXConnector:
                 )
 
         return {"bullish": bullish_fvg, "bearish": bearish_fvg}
+
+    def _bollinger_bands(self, candles, period=20, multiplier=2):
+        # Convert to DataFrame
+        df = pd.DataFrame(
+            candles,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+
+        # Ensure we have enough candles
+        if len(df) < period:
+            raise ValueError(
+                f"Not enough candles to calculate Bollinger Bands (need {period})"
+            )
+
+        # Calculate rolling mean and standard deviation
+        df["sma"] = df["close"].rolling(window=period).mean()
+        df["std"] = df["close"].rolling(window=period).std(ddof=0)
+
+        df["upper_band"] = df["sma"] + (multiplier * df["std"])
+        df["lower_band"] = df["sma"] - (multiplier * df["std"])
+
+        # Return latest valid values
+        return {
+            "upper_band": float(df["upper_band"].iloc[-1]),
+            "lower_band": float(df["lower_band"].iloc[-1]),
+            "sma": float(df["sma"].iloc[-1]),
+        }
+
+    def _rsi(self, candles, period=14):
+        df = pd.DataFrame(
+            candles,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+
+        if len(df) < period + 1:
+            raise ValueError(
+                f"Not enough candles to calculate RSI (need at least {period+1})"
+            )
+
+        delta = df["close"].diff()
+
+        gain = np.where(delta > 0, delta, 0)
+        loss = np.where(delta < 0, -delta, 0)
+
+        avg_gain = pd.Series(gain).ewm(alpha=1 / period, adjust=False).mean()
+        avg_loss = pd.Series(loss).ewm(alpha=1 / period, adjust=False).mean()
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+
+        return float(rsi.iloc[-1])
+
+    def _ema(self, candles, period=20):
+        df = pd.DataFrame(
+            candles,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+
+        if len(df) < period:
+            raise ValueError(f"Not enough candles to calculate EMA (need {period})")
+
+        ema_series = df["close"].ewm(span=period, adjust=False).mean()
+        return [float(v) for v in ema_series.tolist()]
 
     def create_order(
         self,
