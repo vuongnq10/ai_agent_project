@@ -1,12 +1,12 @@
 import os
 import aiohttp
-import asyncio
 from datetime import datetime
 import json
+import config
 
-token = os.getenv("TELEGRAM_TOKEN")
-chat_id = os.getenv("TELEGRAM_CHATID")
-env = os.getenv("ENV", "Unknown")
+token = config.TELEGRAM_TOKEN
+chat_id = config.TELEGRAM_CHATID
+env = config.ENV
 
 
 async def telegram_bot(message: str, more=None):

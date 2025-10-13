@@ -39,8 +39,14 @@ function App() {
     setMessage(""); // Clear input after sending
 
     try {
+      // const eventSource = new EventSource(
+      //   `http://127.0.0.1:8000/master_agent?query=${encodeURIComponent(
+      //     messageToSend
+      //   )}`
+      // );
+
       const eventSource = new EventSource(
-        `http://127.0.0.1:8000/master_agent?query=${encodeURIComponent(
+        `http://127.0.0.1:8000/gemini/stream?query=${encodeURIComponent(
           messageToSend
         )}`
       );

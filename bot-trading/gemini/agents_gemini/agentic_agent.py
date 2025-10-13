@@ -1,25 +1,19 @@
 import json
 import re
 from typing_extensions import TypedDict
-from typing import Dict, Any, List
+from typing import List
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END
 from google.genai.types import Content, Part
 
-from master_agent.agents_gemini.agent import Agent
+from gemini.agents_gemini.agent import Agent
 
-# from master_agent.agents.tool_agent import ToolAgent
-# from master_agent.agents.analyse_agent import AnalyseAgent
-# from master_agent.agents.decision_agent import DecisionAgent
 
-from broker_bot.tools.cx_connector import CXConnector
+from src.tools.cx_connector import CXConnector
 
 memory = InMemorySaver()
 agent = Agent()
-# tool_agent = ToolAgent()
-# analyze_agent = AnalyseAgent()
-# decision_agent = DecisionAgent()
 cx_connector = CXConnector()
 
 

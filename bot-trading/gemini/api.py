@@ -1,31 +1,27 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, StreamingResponse
 import asyncio
+import json
+from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
+
+from gemini.agents_gemini.agentic_agent import MasterGemini
+
+master_gemini = MasterGemini()
 
 gemini = APIRouter()
 
 
-# Normal REST API endpoint
-@gemini.post("/message")
-async def receive_message(request: Request):
-    data = await request.json()
-    message = data.get("message", "")
-    reply = f"Received your message: '{message}'"
-    return JSONResponse(content={"reply": reply})
-
-
 # Streaming text endpoint
 @gemini.get("/stream")
-async def stream_text():
+async def stream_text(query: str = Query(..., description="Text to process or stream")):
     async def event_generator():
-        text_chunks = [
-            "Hello there! 👋\n",
-            "Streaming from /api/stream endpoint...\n",
-            "Each message sent with delay...\n",
-            "Done ✅\n",
-        ]
-        for chunk in text_chunks:
-            yield chunk
-            await asyncio.sleep(1)
 
-    return StreamingResponse(event_generator(), media_type="text/plain")
+        for chunk in master_gemini(query):
+            for line in chunk.splitlines(keepends=True):
+                for char in line:
+                    payload = {"character": char}
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    await asyncio.sleep(0.005)
+
+        yield "event: end\ndata: Stream finished ✅\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

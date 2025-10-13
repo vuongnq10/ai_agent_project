@@ -4,16 +4,17 @@
 import os
 import asyncio
 
-from broker_bot.telegram.telegram import telegram_bot
+from src.telegram.telegram import telegram_bot
 
 from binance_common.configuration import ConfigurationRestAPI
 from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futures import (
     DerivativesTradingUsdsFutures,
 )
+import config
 
-BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
-BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
-# BINANCE_BASE_URL = os.getenv("BINANCE_BASE_URL")
+BINANCE_API_KEY = config.BINANCE_API_KEY
+BINANCE_SECRET_KEY = config.BINANCE_SECRET_KEY
+# BINANCE_BASE_URL = config.BINANCE_BASE_URL
 
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,

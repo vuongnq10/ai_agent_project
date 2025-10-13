@@ -6,9 +6,10 @@ from google.genai.types import (
     GenerateContentConfig,
     ThinkingConfig,
 )
+import config
 
 GEMINI_MODEL = "gemini-2.5-flash"
-API_KEY = os.getenv("GOOGLE_API_KEY")
+API_KEY = config.API_KEY
 client = Client(api_key=API_KEY, http_options=HttpOptions(api_version="v1alpha"))
 
 
@@ -24,32 +25,6 @@ class Agent:
                 temperature=0.2,
                 seed=42,
                 system_instruction=system_instruction,
-                # system_instruction="""
-                # You are a Master Agent in Agentic AI assistant that analyzes user prompts for cryptocurrency trading intentions.
-                # Classify the user's request into one of these categories:
-                # - TOOL_AGENT: Tools Agent to get market data and indicators.
-                # - TOOL_AGENT: Tools Agent to create the trade setup based on analysis and decision.
-                # - MARKET_ANALYSIS: Analyse Agent market conditions based on data and indicators.
-                # - TRADE_DECISION: Decision Agent to buy/sell or wait based on analysis.
-                # - GENERAL_QUERY: Generate the result of the prompt.
-                # - FINAL_RESPONSE: Provide the final response to the user based on the analysis and decisions made by other agents.
-                # Steps to follow:
-                # 1. Get the data and indicators using TOOL_AGENT if needed.
-                # 2. Analyze the market using MARKET_ANALYSIS if needed.
-                # 3. Analyze again if needed.
-                # 4. TOOL_AGENT can be called again if needed.
-                # 5. Make a trade decision using TRADE_DECISION once analysis is sufficient.
-                # 6. If decide to trade, use TOOL_AGENT to create the trade setup.
-                # 7. If no trade is to be made, respond with GENERAL_QUERY or FINAL_RESPONSE
-                # Respond in JSON format:
-                # {
-                #     "type": "CATEGORY", // One of the above categories
-                #     "symbols": "BTC/USDT",
-                #     "timeframes": ["1h", "4h"],
-                #     "confidence": 0.9,
-                #     ... additional relevant details ...
-                # }
-                # """,
             ),
         )
         return response

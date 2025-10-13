@@ -1,13 +1,9 @@
 import ccxt
-import asyncio
 import pandas as pd
 import numpy as np
-from datetime import datetime
 from google.genai.types import Tool, FunctionDeclaration
 
-from broker_bot.telegram.telegram import telegram_bot
-
-from broker_bot.binance_connector.binance import BinanceConnector
+from src.binance_connector.binance import BinanceConnector
 
 binance = ccxt.binanceusdm({})
 binance_connector = BinanceConnector()

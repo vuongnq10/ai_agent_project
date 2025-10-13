@@ -1,2 +1,9 @@
 fastapi
+langchain
+langchain-google-genai
+langgraph
+google-genai
+ccxt
 uvicorn
+pandas
+binance-sdk-derivatives-trading-usds-futures
