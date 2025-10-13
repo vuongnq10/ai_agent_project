@@ -264,6 +264,7 @@ class MasterGemini:
                 
                 Use the data and indicators provided to analyze the market conditions.
                 Provide insights on trends, key levels, and potential trade setups.
+                Predict the price movement based on the analysis.
                 Suggest whether to buy, sell, or wait based on the analysis.
                 
                 Classify the response into one of these categories:

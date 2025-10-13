@@ -7,3 +7,4 @@ ccxt
 uvicorn
 pandas
 binance-sdk-derivatives-trading-usds-futures
+dotenv
