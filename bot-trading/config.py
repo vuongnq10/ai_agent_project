@@ -7,7 +7,8 @@ load_dotenv()
 
 # Access environment variables here
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
-APP_PORT = int(os.getenv("APP_PORT", 8000))
+# APP_PORT = int(os.getenv("APP_PORT", 8000))
+APP_PORT = "8000"
 API_KEY = os.getenv("API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPEN_API_KEY = os.getenv("OPEN_API_KEY")

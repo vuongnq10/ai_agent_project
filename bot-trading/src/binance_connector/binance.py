@@ -73,7 +73,7 @@ class BinanceConnector:
         if (side == "BUY" and order_price > current_price) or (
             side == "SELL" and order_price < current_price
         ):
-            asyncio.run(
+            asyncio.create_task(
                 telegram_bot(
                     f"Order price {order_price} for {symbol} is not valid for current price {current_price} for side {side}"
                 )
@@ -136,7 +136,7 @@ class BinanceConnector:
                     "symbol": symbol,
                     "side": "BUY" if side == "SELL" else "SELL",
                     "type": "TAKE_PROFIT_MARKET",
-                    "stopPrice": str(profit_price),
+                    "stopPrice": take_profit,  # str(profit_price),
                     "closePosition": "true",
                     "timeInForce": "GTC",
                     "firstTrigger": "PLACE_ORDER",
@@ -161,9 +161,9 @@ class BinanceConnector:
             data = response.data()
             result = [item.to_dict() for item in data]
 
-            asyncio.run(telegram_bot(result))
+            asyncio.create_task(telegram_bot(result))
 
-            asyncio.run(
+            asyncio.create_task(
                 telegram_bot(
                     f"""
                     🛒 Create an order for {symbol}  
@@ -180,7 +180,7 @@ class BinanceConnector:
 
             return "success"
         except Exception as e:
-            asyncio.run(
+            asyncio.create_task(
                 telegram_bot(
                     f"""
                     Error creating orders for {symbol} with side {side} and price {order_price}:

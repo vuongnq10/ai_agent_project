@@ -102,6 +102,7 @@ class CXConnector:
 
         indicators = {
             # "candles": candles,
+            "current_price": self.current_price,
             "symbol": symbol,
             "timeframe": timeframe,
             "atr": atr,

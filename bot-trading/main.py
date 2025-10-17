@@ -21,6 +21,6 @@ app.include_router(api.gemini, prefix="/gemini", tags=["API"])
 if __name__ == "__main__":
     # Read env vars with fallback defaults
     host = os.getenv(config.APP_HOST, "127.0.0.1")
-    port = int(os.getenv(config.APP_PORT, 8000))
+    port = int(os.getenv(config.APP_PORT, "8000"))
 
     uvicorn.run("main:app", host=host, port=port, reload=True)
