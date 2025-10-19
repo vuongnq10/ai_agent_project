@@ -279,8 +279,12 @@ class MasterGemini:
                 {
                     "type": "CATEGORY", // One of the above categories
                     "symbols": "BTC/USDT",
-                    "timeframes": ["1h", "4h"],
+                    "timeframes": "4 hours" or "2 hours" or "1 hour",
                     "confidence": 0.9,
+                    "current_price": "30.00",
+                    "entry_price": "30.1",
+                    "stop_loss": "29.00",
+                    "take_profit": "32.00",
                     ... additional relevant details ...
                 }
                 """
@@ -339,6 +343,9 @@ class MasterGemini:
                     "symbols": "BTC/USDT",
                     "timeframes": ["1h", "4h"],
                     "confidence": 0.9,
+                    "entry_price": "30.00",
+                    "stop_loss": "29.00",
+                    "take_profit": "32.00",
                     ... additional relevant details ...
                 }
                 """

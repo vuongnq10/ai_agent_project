@@ -28,9 +28,9 @@ configuration = ConfigurationRestAPI(
 # EXPECTED_STOP_LOSS = 2
 
 LEVERAGE = 20
-ORDER_AMOUNT = 10
-EXPECTED_PROFIT = 0.5
-EXPECTED_STOP_LOSS = 0.5
+ORDER_AMOUNT = 5
+EXPECTED_PROFIT = 0.40
+EXPECTED_STOP_LOSS = 0.75
 
 
 class BinanceConnector:
@@ -136,7 +136,7 @@ class BinanceConnector:
                     "symbol": symbol,
                     "side": "BUY" if side == "SELL" else "SELL",
                     "type": "TAKE_PROFIT_MARKET",
-                    "stopPrice": take_profit,  # str(profit_price),
+                    "stopPrice": str(profit_price),
                     "closePosition": "true",
                     "timeInForce": "GTC",
                     "firstTrigger": "PLACE_ORDER",
