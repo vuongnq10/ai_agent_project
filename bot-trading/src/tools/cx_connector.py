@@ -11,6 +11,7 @@ binance_connector = BinanceConnector()
 
 class CXConnector:
     def __init__(self):
+        self.current_price = None
         self.tools = Tool(
             function_declarations=[
                 FunctionDeclaration(
@@ -88,6 +89,8 @@ class CXConnector:
         extremes = self._find_extremes(swing_points)
         break_of_structure = self._break_of_structure(data, swing_points)
         changes_of_character = self._changes_of_character(data, swing_points)
+        liquidity = self._find_liquidity_levels(swing_points, atr)
+        premium_discount = self._premium_discount_zones(extremes)
 
         bollinger_bands_14 = self._bollinger_bands(candles, period=14, multiplier=2)
         bollinger_bands_20 = self._bollinger_bands(candles, period=20, multiplier=2)
@@ -100,17 +103,24 @@ class CXConnector:
         rsi_14 = self._rsi(candles, 14)
         rsi_21 = self._rsi(candles, 21)
 
+        # Keep only the most recent FVGs to avoid flooding the LLM context
+        recent_fvg = {
+            "bullish": fvg["bullish"][-5:],
+            "bearish": fvg["bearish"][-5:],
+        }
+
         indicators = {
-            # "candles": candles,
             "current_price": self.current_price,
             "symbol": symbol,
             "timeframe": timeframe,
             "atr": atr,
             **swing_points,
             **extremes,
-            "fair_value_gaps": fvg,
+            "fair_value_gaps": recent_fvg,
             "break_of_structure": break_of_structure,
             "changes_of_character": changes_of_character,
+            "liquidity": liquidity,
+            "premium_discount": premium_discount,
             "bollinger_bands": {
                 "14": bollinger_bands_14,
                 "20": bollinger_bands_20,
@@ -179,6 +189,8 @@ class CXConnector:
     def _find_swing_points(self, data, atr, lookback=5):
         high = data["high"]
         low = data["low"]
+        open_ = data["open"]
+        close = data["close"]
         timestamp = data["timestamp"]
 
         swing_highs = []
@@ -191,7 +203,6 @@ class CXConnector:
 
             # Check if current point is a swing high
             for j in range(1, lookback + 1):
-                # Ensure index does not go out of range
                 if i - j < 0 or i + j >= len(high):
                     is_high = False
                     break
@@ -210,27 +221,39 @@ class CXConnector:
 
             if is_high:
                 swing_highs.append({"timestamp": timestamp[i], "price": high[i]})
+                # Bearish OB: last bullish candle (close > open) before the swing high
+                ob_idx = i
+                for k in range(i - 1, max(i - lookback - 1, -1), -1):
+                    if close[k] > open_[k]:
+                        ob_idx = k
+                        break
                 order_blocks.append(
                     {
-                        "high": high[i],
-                        "low": low[i],
-                        "timestamp": timestamp[i],
+                        "high": high[ob_idx],
+                        "low": low[ob_idx],
+                        "timestamp": timestamp[ob_idx],
                         "type": "bearish",
                     }
                 )
 
             if is_low:
                 swing_lows.append({"timestamp": timestamp[i], "price": low[i]})
+                # Bullish OB: last bearish candle (close < open) before the swing low
+                ob_idx = i
+                for k in range(i - 1, max(i - lookback - 1, -1), -1):
+                    if close[k] < open_[k]:
+                        ob_idx = k
+                        break
                 order_blocks.append(
                     {
-                        "high": high[i],
-                        "low": low[i],
-                        "timestamp": timestamp[i],
+                        "high": high[ob_idx],
+                        "low": low[ob_idx],
+                        "timestamp": timestamp[ob_idx],
                         "type": "bullish",
                     }
                 )
 
-        # Filter order blocks
+        # Filter order blocks: discard abnormally wide candles (> 2x ATR)
         filtered_order_blocks = [
             ob for ob in order_blocks if ob["high"] - ob["low"] <= atr * 2
         ]
@@ -350,8 +373,8 @@ class CXConnector:
             if low3 > high1:
                 bullish_fvg.append(
                     {
-                        "top": high1,
-                        "bottom": low3,
+                        "top": low3,
+                        "bottom": high1,
                         "timestamps": timestamps[i],
                         "type": "bullish",
                     }
@@ -369,6 +392,67 @@ class CXConnector:
                 )
 
         return {"bullish": bullish_fvg, "bearish": bearish_fvg}
+
+    def _find_liquidity_levels(self, swing_points, atr):
+        """Identify buy-side (equal highs) and sell-side (equal lows) liquidity pools."""
+        tolerance = atr * 0.15
+        swing_highs = swing_points["swing_highs"]
+        swing_lows = swing_points["swing_lows"]
+
+        buy_side = []
+        sell_side = []
+
+        for i in range(len(swing_highs)):
+            for j in range(i + 1, len(swing_highs)):
+                if abs(swing_highs[i]["price"] - swing_highs[j]["price"]) <= tolerance:
+                    buy_side.append(
+                        {
+                            "price": (swing_highs[i]["price"] + swing_highs[j]["price"]) / 2,
+                            "timestamps": [
+                                swing_highs[i]["timestamp"],
+                                swing_highs[j]["timestamp"],
+                            ],
+                        }
+                    )
+
+        for i in range(len(swing_lows)):
+            for j in range(i + 1, len(swing_lows)):
+                if abs(swing_lows[i]["price"] - swing_lows[j]["price"]) <= tolerance:
+                    sell_side.append(
+                        {
+                            "price": (swing_lows[i]["price"] + swing_lows[j]["price"]) / 2,
+                            "timestamps": [
+                                swing_lows[i]["timestamp"],
+                                swing_lows[j]["timestamp"],
+                            ],
+                        }
+                    )
+
+        return {"buy_side_liquidity": buy_side, "sell_side_liquidity": sell_side}
+
+    def _premium_discount_zones(self, extremes):
+        """Calculate premium/discount zones from the current swing range."""
+        if "highest_swing_high" not in extremes or "lowest_swing_low" not in extremes:
+            return None
+
+        range_high = extremes["highest_swing_high"]["price"]
+        range_low = extremes["lowest_swing_low"]["price"]
+        swing_range = range_high - range_low
+
+        if swing_range <= 0:
+            return None
+
+        equilibrium = range_low + swing_range * 0.5
+        current_zone = "premium" if self.current_price > equilibrium else "discount"
+
+        return {
+            "range_high": range_high,
+            "range_low": range_low,
+            "equilibrium": equilibrium,
+            "premium_zone": {"from": equilibrium, "to": range_high},
+            "discount_zone": {"from": range_low, "to": equilibrium},
+            "current_zone": current_zone,
+        }
 
     def _bollinger_bands(self, candles, period=20, multiplier=2):
         # Convert to DataFrame
@@ -441,6 +525,8 @@ class CXConnector:
         take_profit: float,
         stop_loss: float,
     ):
+        if self.current_price is None:
+            return {"status": "error", "message": "current_price not set — call smc_analysis first"}
         try:
             response = binance_connector.create_orders(
                 symbol=symbol,
