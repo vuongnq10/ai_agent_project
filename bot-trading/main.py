@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import config
 from gemini import api
+from trading import api as trading_api
 
 app = FastAPI(title="Trading Bot API")
 app.add_middleware(
@@ -17,6 +18,7 @@ app.add_middleware(
 
 
 app.include_router(api.gemini, prefix="/gemini", tags=["API"])
+app.include_router(trading_api.trading, prefix="/trading", tags=["Trading"])
 
 if __name__ == "__main__":
     # Read env vars with fallback defaults

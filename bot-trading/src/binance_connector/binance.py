@@ -191,6 +191,18 @@ class BinanceConnector:
             print(f"Error creating orders: {e}")
             return None
 
+    def set_leverage(self, symbol: str, leverage: int):
+        try:
+            response = self.client.rest_api.change_initial_leverage(
+                symbol=symbol, leverage=leverage
+            )
+            data = response.data().to_dict()
+            print(f"Leverage set for {symbol}: {data}")
+            return data
+        except Exception as e:
+            print(f"Error setting leverage for {symbol}: {e}")
+            return None
+
     def get_exchange_info(self, symbol: str = None):
 
         response = self.client.rest_api.exchange_information()

@@ -583,24 +583,118 @@ body {
   .header-left {
     gap: 0.5rem;
   }
-  
+
   .app-title {
     display: none;
   }
-  
+
   .clear-chat-btn span {
     display: none;
   }
-  
+
   .sidebar {
     width: 200px;
   }
-  
+
   .section-title {
     font-size: 0.75rem;
   }
-  
+
   .coin-grid {
     grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
   }
+}
+
+/* Leverage Section */
+.leverage-section {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.leverage-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.leverage-select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  color: #2d3748;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+}
+
+.leverage-select:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.leverage-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.leverage-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #2d3748;
+  outline: none;
+  text-align: center;
+}
+
+.leverage-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.leverage-unit {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.set-leverage-btn {
+  width: 100%;
+  padding: 0.625rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.set-leverage-btn:hover {
+  opacity: 0.9;
+}
+
+.leverage-status {
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.leverage-status.success {
+  background: #f0fff4;
+  color: #276749;
+  border: 1px solid #9ae6b4;
+}
+
+.leverage-status.error {
+  background: #fff5f5;
+  color: #c53030;
+  border: 1px solid #feb2b2;
 }
