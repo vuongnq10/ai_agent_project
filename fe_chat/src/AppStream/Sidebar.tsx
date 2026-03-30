@@ -1,17 +1,18 @@
-import CoinList from "./CoinList";
 import LeveragePanel from "./LeveragePanel";
+import CoinList from "./CoinList";
 
-interface SidebarProps {
+interface Props {
   collapsed: boolean;
   onCoinClick: (coin: string) => void;
+  selectedCoin?: string;
 }
 
-export default function Sidebar({ collapsed, onCoinClick }: SidebarProps) {
+export default function Sidebar({ onCoinClick, selectedCoin }: Props) {
   return (
-    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+    <aside className="sidebar">
       <div className="sidebar-content">
         <LeveragePanel />
-        <CoinList onCoinClick={onCoinClick} />
+        <CoinList onCoinClick={onCoinClick} selectedCoin={selectedCoin} />
       </div>
     </aside>
   );

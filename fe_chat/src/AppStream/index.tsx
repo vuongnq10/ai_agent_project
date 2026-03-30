@@ -1,23 +1,25 @@
 import { useState } from "react";
 import "../App.css";
 import type { ChatMessage } from "./types";
+import type { Timeframe } from "./TimeframeSelector";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
-
-const PROMPT =
-  "Give me 2 random numbers between 1 and 10, if both of them are even, give me the sum of them.";
+import ChartPanel from "./ChartPanel";
 
 export default function App() {
-  const [message, setMessage] = useState(PROMPT);
+  const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedCoin, setSelectedCoin] = useState("BTCUSDT");
 
   const handleCoinClick = (coin: string) => {
-    const query = `identify the trend of ${coin} in 2hr and lower timeframes, verify in lower timeframes for key support, resistance levels, entry points and others indicators, find the strongest demand and supply zones, determine the trade setup regarding the key levels`;
-    setMessage(query);
+    setSelectedCoin(coin);
+  };
+
+  const handleAnalyze = (symbol: string, timeframe: Timeframe) => {
+    const query = `Analyze ${symbol} on the ${timeframe} timeframe using Smart Money Concepts. Identify: trend direction, key support/resistance levels, order blocks, fair value gaps, BOS/CHoCH, liquidity levels, and suggest a trade setup with entry, stop loss, and take profit.`;
     handleSubmit({ preventDefault: () => {} } as React.FormEvent, query);
   };
 
@@ -43,28 +45,22 @@ export default function App() {
         fullMessage += character;
         setChatHistory((prev) => {
           const next = [...prev];
-          next[next.length - 1].content = fullMessage;
+          next[next.length - 1] = { ...next[next.length - 1], content: fullMessage };
           return next;
         });
       };
 
       eventSource.addEventListener("end", () => {
-        console.log("Stream finished ✅");
         eventSource.close();
         setLoading(false);
       });
 
-      eventSource.onerror = (error) => {
-        console.error("EventSource error:", error);
+      eventSource.onerror = () => {
         eventSource.close();
         setLoading(false);
       };
-    } catch (error) {
-      console.error("Error setting up EventSource:", error);
-      setChatHistory((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, something went wrong." },
-      ]);
+    } catch {
+      setChatHistory((prev) => [...prev, { role: "assistant", content: "Sorry, something went wrong." }]);
       setLoading(false);
     }
   };
@@ -72,12 +68,17 @@ export default function App() {
   return (
     <div className="app-container">
       <Header
-        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onToggleSidebar={() => {}}
         onClearChat={() => setChatHistory([])}
+        selectedCoin={selectedCoin}
       />
       <main className="main-content">
-        <Sidebar collapsed={sidebarCollapsed} onCoinClick={handleCoinClick} />
-        <section className="chat-container">
+        <Sidebar collapsed={false} onCoinClick={handleCoinClick} selectedCoin={selectedCoin} />
+        <section className="dashboard-center">
+          <ChartPanel symbol={selectedCoin} onAnalyze={handleAnalyze} />
+        </section>
+        <aside className="chat-panel">
+          <div className="chat-panel-header">AI Trading Assistant</div>
           <ChatMessages chatHistory={chatHistory} loading={loading} />
           <ChatInput
             message={message}
@@ -85,7 +86,7 @@ export default function App() {
             onChange={setMessage}
             onSubmit={handleSubmit}
           />
-        </section>
+        </aside>
       </main>
     </div>
   );
