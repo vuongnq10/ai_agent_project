@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { coins } from "../coins";
-import type { LeverageStatus } from "./types";
+import { coins } from "../../coins";
+import type { LeverageStatus } from "../types";
 
 export default function LeveragePanel() {
   const [symbol, setSymbol] = useState("SOLUSDT");

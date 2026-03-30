@@ -9,10 +9,10 @@ import {
   LineStyle,
   createSeriesMarkers,
 } from "lightweight-charts";
-import type { Candle } from "./types";
-import type { SMCResult } from "./indicators";
-import { calcEMA, calcBB } from "./indicators";
-import { BoxPrimitive, HLinePrimitive } from "./smcDrawings";
+import type { Candle } from "../types";
+import type { SMCResult } from "../indicators";
+import { calcEMA, calcBB } from "../indicators";
+import { BoxPrimitive, HLinePrimitive } from "../smcDrawings";
 
 interface Props {
   candles: Candle[];
@@ -333,14 +333,102 @@ export default function CandleChart({
       createSeriesMarkers(candleSeries, unique);
     }
 
-    const ro = new ResizeObserver(() =>
-      chart.applyOptions({ width: container.clientWidth })
-    );
+    // ── Viewport High / Low labels pinned to candle ──────────────────────────
+    container.style.position = "relative";
+
+    const fmt = (p: number) =>
+      p < 0.0001 ? p.toPrecision(4)
+      : p < 0.01  ? p.toFixed(6)
+      : p < 1     ? p.toFixed(4)
+      : p < 100   ? p.toFixed(3)
+      : p < 10000 ? p.toFixed(2)
+      : p.toFixed(1);
+
+    const mkLabel = (isHigh: boolean) => {
+      const el = document.createElement("div");
+      el.style.cssText = [
+        "position:absolute",
+        `background:${isHigh ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)"}`,
+        `border:1px solid ${isHigh ? "rgba(34,197,94,0.7)" : "rgba(239,68,68,0.7)"}`,
+        `color:${isHigh ? "#4ade80" : "#f87171"}`,
+        "font-size:10px",
+        "font-family:monospace",
+        "padding:1px 5px",
+        "border-radius:3px",
+        "white-space:nowrap",
+        "pointer-events:none",
+        "display:none",
+        "z-index:10",
+        "line-height:16px",
+        "transform:translateX(-50%)",
+      ].join(";");
+      container.appendChild(el);
+      return el;
+    };
+
+    const highLabel = mkLabel(true);
+    const lowLabel  = mkLabel(false);
+
+    // Clamp label so it doesn't overflow left/right edges of the chart area
+    const clampX = (x: number, labelW: number, chartW: number) =>
+      Math.min(Math.max(x, labelW / 2 + 4), chartW - labelW / 2 - 70);
+
+    const updateHL = () => {
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (!range) return;
+      const from = Math.max(0, Math.floor(range.from));
+      const to   = Math.min(candles.length - 1, Math.ceil(range.to));
+      if (from > to) return;
+
+      let maxH = -Infinity, minL = Infinity;
+      let maxIdx = from, minIdx = from;
+      for (let i = from; i <= to; i++) {
+        if (candles[i].high > maxH) { maxH = candles[i].high; maxIdx = i; }
+        if (candles[i].low  < minL) { minL = candles[i].low;  minIdx = i; }
+      }
+
+      const highY = candleSeries.priceToCoordinate(maxH);
+      const lowY  = candleSeries.priceToCoordinate(minL);
+      const highX = chart.timeScale().timeToCoordinate(candles[maxIdx].time as any);
+      const lowX  = chart.timeScale().timeToCoordinate(candles[minIdx].time as any);
+      const chartW = container.clientWidth;
+      const LABEL_H = 18;
+
+      if (highY != null && highX != null) {
+        const top = Math.max(0, highY - LABEL_H - 4);
+        highLabel.textContent = `▲ ${fmt(maxH)}`;
+        highLabel.style.top     = `${top}px`;
+        highLabel.style.left    = `${clampX(highX, highLabel.offsetWidth || 80, chartW)}px`;
+        highLabel.style.display = "block";
+      } else {
+        highLabel.style.display = "none";
+      }
+
+      if (lowY != null && lowX != null) {
+        const top = lowY + 4;
+        lowLabel.textContent = `▼ ${fmt(minL)}`;
+        lowLabel.style.top     = `${top}px`;
+        lowLabel.style.left    = `${clampX(lowX, lowLabel.offsetWidth || 80, chartW)}px`;
+        lowLabel.style.display = "block";
+      } else {
+        lowLabel.style.display = "none";
+      }
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(updateHL);
+    updateHL();
+
+    const ro = new ResizeObserver(() => {
+      chart.applyOptions({ width: container.clientWidth });
+      updateHL();
+    });
     ro.observe(container);
 
     return () => {
       ro.disconnect();
       chart.remove();
+      highLabel.remove();
+      lowLabel.remove();
     };
   }, [candles, height, smcMode, smcData]);
 

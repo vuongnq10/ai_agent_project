@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "../App.css";
 import type { ChatMessage } from "./types";
-import type { Timeframe } from "./TimeframeSelector";
+import type { Timeframe } from "./ChartPanel/TimeframeSelector";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import ChatMessages from "./ChatMessages";

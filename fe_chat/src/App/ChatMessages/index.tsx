@@ -1,7 +1,7 @@
 import { useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage } from "./types";
+import type { ChatMessage } from "../types";
 
 interface ChatMessagesProps {
   chatHistory: ChatMessage[];

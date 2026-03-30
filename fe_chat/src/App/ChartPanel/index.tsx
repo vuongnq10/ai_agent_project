@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { Candle } from "./types";
-import { calcSMC } from "./indicators";
+import type { Candle } from "../types";
+import { calcSMC } from "../indicators";
 import MarketBar from "./MarketBar";
 import CandleChart from "./CandleChart";
 import IndicatorChart from "./IndicatorChart";

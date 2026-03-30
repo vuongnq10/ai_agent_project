@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Ticker } from "./types";
+import type { Ticker } from "../types";
 
 interface Props {
   symbol: string;

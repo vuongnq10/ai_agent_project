@@ -1,4 +1,4 @@
-import { coins } from "../coins";
+import { coins } from "../../coins";
 
 interface Props {
   onCoinClick: (coin: string) => void;

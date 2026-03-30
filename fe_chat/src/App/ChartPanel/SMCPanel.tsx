@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import type { Candle } from "./types";
-import { calcSMC } from "./indicators";
+import type { Candle } from "../types";
+import { calcSMC } from "../indicators";
 
 interface Props {
   candles: Candle[];
