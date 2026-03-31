@@ -599,22 +599,34 @@ class CXConnector:
         if len(swing_indices) < 4:
             return {"bos": [], "choch": [], "current_structure": "unknown"}
 
-        # Determine initial structure from the first few swing points
-        # Look for HH+HL (bullish) or LL+LH (bearish) pattern
-        highs_seen = []
-        lows_seen = []
+        # Determine initial structure from the first few swing points.
+        # Walk swing points in chronological order, tracking the last two of
+        # each type AS THEY ALTERNATE.  This enforces the HH+HL / LL+LH
+        # pattern on actually adjacent swings rather than mixing non-adjacent
+        # highs and lows from opposite ends of the dataset.
+        prev_sh = None  # (index, price) of the second-to-last swing high seen
+        last_sh = None  # (index, price) of the most recent swing high seen
+        prev_sl = None
+        last_sl = None
         for si in swing_indices:
             if swing_type[si] == 1.0:
-                highs_seen.append(swing_price[si])
+                prev_sh = last_sh
+                last_sh = (si, swing_price[si])
             else:
-                lows_seen.append(swing_price[si])
-            if len(highs_seen) >= 2 and len(lows_seen) >= 2:
+                prev_sl = last_sl
+                last_sl = (si, swing_price[si])
+            # Stop as soon as we have two of each type
+            if prev_sh is not None and prev_sl is not None:
                 break
 
-        if len(highs_seen) >= 2 and len(lows_seen) >= 2:
-            if highs_seen[-1] > highs_seen[-2] and lows_seen[-1] > lows_seen[-2]:
+        if prev_sh is not None and prev_sl is not None:
+            hh = last_sh[1] > prev_sh[1]   # higher high
+            hl = last_sl[1] > prev_sl[1]   # higher low
+            lh = last_sh[1] < prev_sh[1]   # lower high
+            ll = last_sl[1] < prev_sl[1]   # lower low
+            if hh and hl:
                 structure = "bullish"
-            elif highs_seen[-1] < highs_seen[-2] and lows_seen[-1] < lows_seen[-2]:
+            elif lh and ll:
                 structure = "bearish"
 
         # Track the last confirmed swing high and swing low
@@ -667,7 +679,10 @@ class CXConnector:
                 last_sh_price = None  # consumed
 
             # --- Bearish break: close below last swing low ---
-            if last_sl_price is not None and close[i] < last_sl_price:
+            # elif prevents the same candle from triggering both a bullish and
+            # bearish break simultaneously (e.g. a wide engulfing candle that
+            # closes above last_sh and below last_sl in extreme volatility).
+            elif last_sl_price is not None and close[i] < last_sl_price:
                 broken_level = float(last_sl_price)
                 ts = int(timestamps[i])
 

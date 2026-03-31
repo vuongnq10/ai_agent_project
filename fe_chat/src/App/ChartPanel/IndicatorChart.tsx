@@ -1,22 +1,25 @@
 import { useEffect, useRef } from "react";
-import { createChart, ColorType, LineSeries, HistogramSeries } from "lightweight-charts";
+import { createChart, ColorType, LineSeries } from "lightweight-charts";
 import type { Candle } from "../types";
-import { calcRSI, calcMACD } from "../indicators";
+import type { IndicatorId } from "./IndicatorPicker";
+import { calcRSI } from "../indicators";
 
 interface Props {
   candles: Candle[];
+  activeIndicators: Set<IndicatorId>;
 }
 
-export default function IndicatorChart({ candles }: Props) {
+export default function IndicatorChart({ candles, activeIndicators }: Props) {
   const rsiRef = useRef<HTMLDivElement>(null);
-  const macdRef = useRef<HTMLDivElement>(null);
+
+  const showRSI = activeIndicators.has("rsi");
 
   useEffect(() => {
-    if (!rsiRef.current || !macdRef.current || candles.length === 0) return;
+    if (!showRSI || !rsiRef.current || candles.length === 0) return;
+
     const closes = candles.map((c) => c.close);
 
-    // RSI chart
-    const rsiChart = createChart(rsiRef.current, {
+    const chart = createChart(rsiRef.current, {
       layout: { background: { type: ColorType.Solid, color: "#0d1117" }, textColor: "#9ca3af" },
       grid: { vertLines: { color: "#1f2937" }, horzLines: { color: "#1f2937" } },
       rightPriceScale: { borderColor: "#374151", scaleMargins: { top: 0.1, bottom: 0.1 } },
@@ -24,8 +27,9 @@ export default function IndicatorChart({ candles }: Props) {
       width: rsiRef.current.clientWidth,
       height: 120,
     });
+
     const rsiData = calcRSI(closes, 14);
-    const rsiSeries = rsiChart.addSeries(LineSeries, {
+    const rsiSeries = chart.addSeries(LineSeries, {
       color: "#f59e0b",
       lineWidth: 2,
       priceLineVisible: false,
@@ -33,81 +37,30 @@ export default function IndicatorChart({ candles }: Props) {
     rsiSeries.setData(
       candles.map((c, i) => ({ time: c.time as any, value: rsiData[i] })).filter((d) => d.value != null) as any
     );
-    // overbought / oversold reference lines
-    const ob = rsiChart.addSeries(LineSeries, {
-      color: "rgba(242,54,69,0.4)",
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    });
-    const os = rsiChart.addSeries(LineSeries, {
-      color: "rgba(8,153,129,0.4)",
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    });
+
+    const ob = chart.addSeries(LineSeries, { color: "rgba(242,54,69,0.4)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    const os = chart.addSeries(LineSeries, { color: "rgba(8,153,129,0.4)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
     const validCandles = candles.filter((_, i) => rsiData[i] != null);
     if (validCandles.length > 0) {
       ob.setData(validCandles.map((c) => ({ time: c.time as any, value: 70 })));
       os.setData(validCandles.map((c) => ({ time: c.time as any, value: 30 })));
     }
 
-    // MACD chart
-    const macdChart = createChart(macdRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "#0d1117" }, textColor: "#9ca3af" },
-      grid: { vertLines: { color: "#1f2937" }, horzLines: { color: "#1f2937" } },
-      rightPriceScale: { borderColor: "#374151" },
-      timeScale: { borderColor: "#374151", timeVisible: true, secondsVisible: false },
-      width: macdRef.current.clientWidth,
-      height: 120,
-    });
-    const { macdLine, signalLine, histogram } = calcMACD(closes);
-    const macdSeries = macdChart.addSeries(LineSeries, {
-      color: "#3b82f6",
-      lineWidth: 2,
-      priceLineVisible: false,
-    });
-    macdSeries.setData(
-      candles.map((c, i) => ({ time: c.time as any, value: macdLine[i] })).filter((d) => d.value != null) as any
-    );
-    const sigSeries = macdChart.addSeries(LineSeries, {
-      color: "#f97316",
-      lineWidth: 1,
-      priceLineVisible: false,
-    });
-    sigSeries.setData(
-      candles.map((c, i) => ({ time: c.time as any, value: signalLine[i] })).filter((d) => d.value != null) as any
-    );
-    const histSeries = macdChart.addSeries(HistogramSeries, { priceLineVisible: false });
-    histSeries.setData(
-      candles
-        .map((c, i) => ({
-          time: c.time as any,
-          value: histogram[i],
-          color: (histogram[i] ?? 0) >= 0 ? "rgba(8,153,129,0.5)" : "rgba(242,54,69,0.5)",
-        }))
-        .filter((d) => d.value != null) as any
-    );
-
-    const roRsi = new ResizeObserver(() => rsiChart.applyOptions({ width: rsiRef.current!.clientWidth }));
-    const roMacd = new ResizeObserver(() => macdChart.applyOptions({ width: macdRef.current!.clientWidth }));
-    roRsi.observe(rsiRef.current);
-    roMacd.observe(macdRef.current);
+    const ro = new ResizeObserver(() => chart.applyOptions({ width: rsiRef.current!.clientWidth }));
+    ro.observe(rsiRef.current);
 
     return () => {
-      roRsi.disconnect();
-      roMacd.disconnect();
-      rsiChart.remove();
-      macdChart.remove();
+      ro.disconnect();
+      chart.remove();
     };
-  }, [candles]);
+  }, [candles, showRSI]);
+
+  if (!showRSI) return null;
 
   return (
     <div className="indicator-charts">
       <div className="indicator-label">RSI (14)</div>
       <div ref={rsiRef} className="indicator-chart-container" />
-      <div className="indicator-label">MACD (12/26/9)</div>
-      <div ref={macdRef} className="indicator-chart-container" />
     </div>
   );
 }

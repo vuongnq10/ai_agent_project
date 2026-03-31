@@ -5,6 +5,7 @@ import CandleChart from "./CandleChart";
 import IndicatorChart from "./IndicatorChart";
 import SMCPanel from "./SMCPanel";
 import TimeframeSelector, { type Timeframe } from "./TimeframeSelector";
+import IndicatorPicker, { type IndicatorId, INDICATORS } from "./IndicatorPicker";
 import { useCandles } from "../../hooks/useCandles";
 
 interface Props {
@@ -12,10 +13,27 @@ interface Props {
   onAnalyze: (symbol: string, timeframe: Timeframe) => void;
 }
 
+const DEFAULT_ACTIVE = new Set<IndicatorId>(["ema9", "ema20", "ema50", "bb", "rsi"]);
+
 export default function ChartPanel({ symbol, onAnalyze }: Props) {
   const [smcMode, setSmcMode] = useState(false);
+  const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(DEFAULT_ACTIVE);
   const { candles, loading, timeframe, setTimeframe } = useCandles(symbol);
   const smcData = useMemo(() => calcSMC(candles), [candles]);
+
+  const toggleIndicator = (id: IndicatorId, checked: boolean) => {
+    setActiveIndicators((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  // Active overlay indicators for the legend strip
+  const activeLegend = INDICATORS.filter(
+    (i) => i.group === "overlay" && activeIndicators.has(i.id)
+  );
 
   return (
     <div className="chart-panel">
@@ -23,6 +41,7 @@ export default function ChartPanel({ symbol, onAnalyze }: Props) {
         <MarketBar symbol={symbol} />
         <div className="chart-toolbar-right">
           <TimeframeSelector value={timeframe} onChange={setTimeframe} />
+          <IndicatorPicker active={activeIndicators} onChange={toggleIndicator} />
           <label className="smc-toggle" title={smcMode ? "Switch to Classic" : "Switch to SMC"}>
             <input
               type="checkbox"
@@ -43,14 +62,22 @@ export default function ChartPanel({ symbol, onAnalyze }: Props) {
         <div className="chart-loading">Loading chart data...</div>
       ) : (
         <>
-          <CandleChart candles={candles} height={360} smcMode={smcMode} smcData={smcData} />
-          <div className="chart-legend">
-            <span className="legend-item ema9">EMA 9</span>
-            <span className="legend-item ema20">EMA 20</span>
-            <span className="legend-item ema50">EMA 50</span>
-            <span className="legend-item bb">BB (20,2)</span>
-          </div>
-          <IndicatorChart candles={candles} />
+          <CandleChart
+            candles={candles}
+            smcMode={smcMode}
+            smcData={smcData}
+            activeIndicators={activeIndicators}
+          />
+          {activeLegend.length > 0 && (
+            <div className="chart-legend">
+              {activeLegend.map((ind) => (
+                <span key={ind.id} className="legend-item" style={{ color: ind.color }}>
+                  {ind.label}
+                </span>
+              ))}
+            </div>
+          )}
+          <IndicatorChart candles={candles} activeIndicators={activeIndicators} />
           <SMCPanel candles={candles} />
         </>
       )}

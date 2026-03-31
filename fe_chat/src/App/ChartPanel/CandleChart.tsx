@@ -19,6 +19,7 @@ interface Props {
   height?: number;
   smcMode?: boolean;
   smcData?: SMCResult | null;
+  activeIndicators?: Set<string>;
 }
 
 export default function CandleChart({
@@ -26,6 +27,7 @@ export default function CandleChart({
   height = 360,
   smcMode = false,
   smcData,
+  activeIndicators = new Set(["ema9", "ema20", "ema50", "bb"]),
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -82,13 +84,14 @@ export default function CandleChart({
     const closes = candles.map((c) => c.close);
     const lastTime = candles[candles.length - 1].time as any;
 
-    // ── Classic mode: EMA + Bollinger Bands ───────────────────────────────────
-    if (!smcMode) {
-      for (const { period, color } of [
-        { period: 9, color: "#f59e0b" },
-        { period: 20, color: "#3b82f6" },
-        { period: 50, color: "#a855f7" },
+    // ── Overlay indicators: shown independently of SMC mode ──────────────────
+    if (activeIndicators.has("ema9") || activeIndicators.has("ema20") || activeIndicators.has("ema50")) {
+      for (const { id, period, color } of [
+        { id: "ema9",  period: 9,  color: "#f59e0b" },
+        { id: "ema20", period: 20, color: "#3b82f6" },
+        { id: "ema50", period: 50, color: "#a855f7" },
       ]) {
+        if (!activeIndicators.has(id)) continue;
         const ema = calcEMA(closes, period);
         const s = chart.addSeries(LineSeries, {
           color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
@@ -99,15 +102,19 @@ export default function CandleChart({
             .filter((d) => d.value != null) as any
         );
       }
+    }
+
+    if (activeIndicators.has("bb")) {
       const bb = calcBB(closes, 20, 2);
       const bbStyle = { color: "rgba(100,116,139,0.55)", lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false };
       const bbU = chart.addSeries(LineSeries, bbStyle);
       const bbL = chart.addSeries(LineSeries, bbStyle);
       bbU.setData(candles.map((c, i) => ({ time: c.time as any, value: bb.upper[i] })).filter((d) => d.value != null) as any);
       bbL.setData(candles.map((c, i) => ({ time: c.time as any, value: bb.lower[i] })).filter((d) => d.value != null) as any);
+    }
 
-    // ── SMC mode: blocks, areas, lines, markers ────────────────────────────
-    } else if (smcData) {
+    // ── SMC mode overlays ─────────────────────────────────────────────────────
+    if (smcMode && smcData) {
 
       // ── Order Blocks: filled rectangles ────────────────────────────────────
       for (const ob of smcData.orderBlocks) {
@@ -115,7 +122,6 @@ export default function CandleChart({
         const timeFrom = candles[ob.index]?.time as any ?? lastTime;
 
         if (!ob.mitigated) {
-          // Active OB — solid fill + solid border
           (candleSeries as any).attachPrimitive(
             new BoxPrimitive({
               timeFrom,
@@ -129,7 +135,6 @@ export default function CandleChart({
             })
           );
         } else {
-          // Mitigated OB — faded, dashed border
           (candleSeries as any).attachPrimitive(
             new BoxPrimitive({
               timeFrom,
@@ -145,7 +150,7 @@ export default function CandleChart({
         }
       }
 
-      // ── Fair Value Gaps: filled areas ────────────────────────────────────
+      // ── Fair Value Gaps ──────────────────────────────────────────────────
       for (const fvg of smcData.fairValueGaps) {
         const isBull = fvg.type === "bullish";
         const timeFrom = candles[fvg.index]?.time as any ?? lastTime;
@@ -164,7 +169,7 @@ export default function CandleChart({
         );
       }
 
-      // ── BOS: horizontal line from the broken swing to right edge ────────
+      // ── BOS ──────────────────────────────────────────────────────────────
       if (smcData.lastBOS) {
         const swings =
           smcData.lastBOS.direction === "bullish"
@@ -188,7 +193,7 @@ export default function CandleChart({
         }
       }
 
-      // ── CHoCH: horizontal line, orange ───────────────────────────────────
+      // ── CHoCH ────────────────────────────────────────────────────────────
       if (smcData.lastCHoCH) {
         const swings =
           smcData.lastCHoCH.direction === "bullish"
@@ -212,7 +217,7 @@ export default function CandleChart({
         }
       }
 
-      // ── Equilibrium: dashed center line ──────────────────────────────────
+      // ── Equilibrium ──────────────────────────────────────────────────────
       candleSeries.createPriceLine({
         price: smcData.equilibrium,
         color: "rgba(245,158,11,0.5)",
@@ -222,7 +227,7 @@ export default function CandleChart({
         title: "EQ 50%",
       });
 
-      // ── BSL / SSL: dotted liquidity levels ───────────────────────────────
+      // ── BSL / SSL ────────────────────────────────────────────────────────
       for (const level of smcData.buySideLiquidity.slice(0, 3)) {
         candleSeries.createPriceLine({
           price: level,
@@ -244,7 +249,7 @@ export default function CandleChart({
         });
       }
 
-      // ── Swing Highs / Lows: circle markers ───────────────────────────────
+      // ── Swing Markers ────────────────────────────────────────────────────
       const markers: {
         time: any;
         position: "aboveBar" | "belowBar";
@@ -256,72 +261,43 @@ export default function CandleChart({
 
       for (const sh of smcData.swingHighs.slice(-12)) {
         if (sh.index < candles.length) {
-          markers.push({
-            time: candles[sh.index].time as any,
-            position: "aboveBar",
-            color: "rgba(242,54,69,0.75)",
-            shape: "circle",
-            size: 0.5,
-            text: "",
-          });
+          markers.push({ time: candles[sh.index].time as any, position: "aboveBar", color: "rgba(242,54,69,0.75)", shape: "circle", size: 0.5, text: "" });
         }
       }
       for (const sl of smcData.swingLows.slice(-12)) {
         if (sl.index < candles.length) {
-          markers.push({
-            time: candles[sl.index].time as any,
-            position: "belowBar",
-            color: "rgba(8,153,129,0.75)",
-            shape: "circle",
-            size: 0.5,
-            text: "",
-          });
+          markers.push({ time: candles[sl.index].time as any, position: "belowBar", color: "rgba(8,153,129,0.75)", shape: "circle", size: 0.5, text: "" });
         }
       }
 
-      // BOS arrow marker at the swing that was broken
       if (smcData.lastBOS) {
-        const swings =
-          smcData.lastBOS.direction === "bullish"
-            ? smcData.swingHighs
-            : smcData.swingLows;
-        const swing = swings.find(
-          (s) => Math.abs(s.price - smcData.lastBOS!.price) < smcData.lastBOS!.price * 0.001
-        );
+        const swings = smcData.lastBOS.direction === "bullish" ? smcData.swingHighs : smcData.swingLows;
+        const swing = swings.find((s) => Math.abs(s.price - smcData.lastBOS!.price) < smcData.lastBOS!.price * 0.001);
         if (swing && swing.index < candles.length) {
           markers.push({
             time: candles[swing.index].time as any,
             position: smcData.lastBOS.direction === "bullish" ? "aboveBar" : "belowBar",
             color: smcData.lastBOS.direction === "bullish" ? "#089981" : "#f23645",
             shape: smcData.lastBOS.direction === "bullish" ? "arrowUp" : "arrowDown",
-            size: 1.5,
-            text: "BOS",
+            size: 1.5, text: "BOS",
           });
         }
       }
 
-      // CHoCH arrow marker
       if (smcData.lastCHoCH) {
-        const swings =
-          smcData.lastCHoCH.direction === "bullish"
-            ? smcData.swingHighs
-            : smcData.swingLows;
-        const swing = swings.find(
-          (s) => Math.abs(s.price - smcData.lastCHoCH!.price) < smcData.lastCHoCH!.price * 0.001
-        );
+        const swings = smcData.lastCHoCH.direction === "bullish" ? smcData.swingHighs : smcData.swingLows;
+        const swing = swings.find((s) => Math.abs(s.price - smcData.lastCHoCH!.price) < smcData.lastCHoCH!.price * 0.001);
         if (swing && swing.index < candles.length) {
           markers.push({
             time: candles[swing.index].time as any,
             position: smcData.lastCHoCH.direction === "bullish" ? "aboveBar" : "belowBar",
             color: "#f97316",
             shape: smcData.lastCHoCH.direction === "bullish" ? "arrowUp" : "arrowDown",
-            size: 1.5,
-            text: "CHoCH",
+            size: 1.5, text: "CHoCH",
           });
         }
       }
 
-      // Deduplicate and sort by time
       const seen = new Set<string>();
       const unique = markers.filter((m) => {
         const k = `${m.time}-${m.position}-${m.text}`;
@@ -430,7 +406,7 @@ export default function CandleChart({
       highLabel.remove();
       lowLabel.remove();
     };
-  }, [candles, height, smcMode, smcData]);
+  }, [candles, height, smcMode, smcData, activeIndicators]);
 
   return <div ref={containerRef} className="candle-chart-container" />;
 }

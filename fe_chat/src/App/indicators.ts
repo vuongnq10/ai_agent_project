@@ -91,20 +91,25 @@ export function calcSMC(candles: Candle[]): SMCResult {
   const close = candles[candles.length - 1].close;
   let lastBOS: SMCResult["lastBOS"] = null;
   let lastCHoCH: SMCResult["lastCHoCH"] = null;
+  // Track the candle index of the swing point that was broken so we can
+  // compare recency without fragile float equality on prices.
+  let lastBOSSwingIndex = -1;
 
-  // BOS bullish: close broke above a prior swing high
+  // BOS bullish: current close is above the most recent swing high it broke
   for (let i = swingHighs.length - 1; i >= 0; i--) {
     if (close > swingHighs[i].price) {
       lastBOS = { price: swingHighs[i].price, direction: "bullish" };
-      // CHoCH if that break was against prior bearish structure
+      lastBOSSwingIndex = swingHighs[i].index;
       if (trend === "bearish") lastCHoCH = { price: swingHighs[i].price, direction: "bullish" };
       break;
     }
   }
-  // BOS bearish: close broke below a prior swing low
+  // BOS bearish: current close is below the most recent swing low it broke.
+  // Only overrides the bullish BOS if this swing low occurred more recently
+  // (higher candle index) than the swing high that was broken above.
   for (let i = swingLows.length - 1; i >= 0; i--) {
     if (close < swingLows[i].price) {
-      if (!lastBOS || swingLows[i].index > (swingHighs.find(h => h.price === lastBOS!.price)?.index ?? 0)) {
+      if (swingLows[i].index > lastBOSSwingIndex) {
         lastBOS = { price: swingLows[i].price, direction: "bearish" };
         if (trend === "bullish") lastCHoCH = { price: swingLows[i].price, direction: "bearish" };
       }
@@ -120,11 +125,14 @@ export function calcSMC(candles: Candle[]): SMCResult {
     // find last red candle at/before this swing low
     for (let j = swIdx; j >= Math.max(0, swIdx - 10); j--) {
       if (candles[j].close < candles[j].open) {
-        const mitigated = candles.slice(j + 1).some((c) => c.low <= candles[j].high && c.high >= candles[j].low);
-        orderBlocks.push({
-          type: "bullish", index: j,
-          high: candles[j].high, low: candles[j].low, mitigated,
-        });
+        const obHigh = candles[j].high;
+        const obLow = candles[j].low;
+        // Mitigated when a subsequent candle CLOSES inside the OB zone.
+        // Wick-only touches are not counted — price must commit with a close.
+        const mitigated = candles.slice(j + 1).some(
+          (c) => c.close >= obLow && c.close <= obHigh
+        );
+        orderBlocks.push({ type: "bullish", index: j, high: obHigh, low: obLow, mitigated });
         break;
       }
     }
@@ -134,11 +142,12 @@ export function calcSMC(candles: Candle[]): SMCResult {
     const swIdx = swingHighs[i].index;
     for (let j = swIdx; j >= Math.max(0, swIdx - 10); j--) {
       if (candles[j].close > candles[j].open) {
-        const mitigated = candles.slice(j + 1).some((c) => c.high >= candles[j].low && c.low <= candles[j].high);
-        orderBlocks.push({
-          type: "bearish", index: j,
-          high: candles[j].high, low: candles[j].low, mitigated,
-        });
+        const obHigh = candles[j].high;
+        const obLow = candles[j].low;
+        const mitigated = candles.slice(j + 1).some(
+          (c) => c.close >= obLow && c.close <= obHigh
+        );
+        orderBlocks.push({ type: "bearish", index: j, high: obHigh, low: obLow, mitigated });
         break;
       }
     }
@@ -149,15 +158,20 @@ export function calcSMC(candles: Candle[]): SMCResult {
   for (let i = 1; i < candles.length - 1; i++) {
     const prev = candles[i - 1];
     const next = candles[i + 1];
-    // Bullish FVG: gap between prev high and next low
+    // Bullish FVG: gap between prev high and next low [prev.high, next.low]
     if (prev.high < next.low) {
-      const filled = candles.slice(i + 2).some((c) => c.low <= prev.high + (next.low - prev.high) * 0.5);
-      fairValueGaps.push({ type: "bullish", high: next.low, low: prev.high, index: i, filled });
+      const gapBottom = prev.high;
+      const gapTop = next.low;
+      // Filled when a subsequent candle CLOSES into the gap zone (not just wicks).
+      const filled = candles.slice(i + 2).some((c) => c.close <= gapTop && c.close >= gapBottom);
+      fairValueGaps.push({ type: "bullish", high: gapTop, low: gapBottom, index: i, filled });
     }
-    // Bearish FVG: gap between prev low and next high
+    // Bearish FVG: gap between next high and prev low [next.high, prev.low]
     if (prev.low > next.high) {
-      const filled = candles.slice(i + 2).some((c) => c.high >= prev.low - (prev.low - next.high) * 0.5);
-      fairValueGaps.push({ type: "bearish", high: prev.low, low: next.high, index: i, filled });
+      const gapBottom = next.high;
+      const gapTop = prev.low;
+      const filled = candles.slice(i + 2).some((c) => c.close >= gapBottom && c.close <= gapTop);
+      fairValueGaps.push({ type: "bearish", high: gapTop, low: gapBottom, index: i, filled });
     }
   }
   // Keep only the 3 most recent per type

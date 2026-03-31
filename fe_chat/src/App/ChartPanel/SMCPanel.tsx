@@ -12,10 +12,22 @@ function fmt(n: number): string {
   return n.toFixed(4);
 }
 
+function distPct(price: number, ref: number): string {
+  if (ref === 0) return "—";
+  return (Math.abs((price - ref) / ref) * 100).toFixed(2) + "%";
+}
+
+function gapSizePct(high: number, low: number, ref: number): string {
+  if (ref === 0) return "—";
+  return ((high - low) / ref * 100).toFixed(2) + "%";
+}
+
 export default function SMCPanel({ candles }: Props) {
   const smc = useMemo(() => calcSMC(candles), [candles]);
 
   if (candles.length === 0) return null;
+
+  const currentPrice = candles[candles.length - 1]?.close ?? 0;
 
   const trendColor =
     smc.trend === "bullish" ? "#089981" : smc.trend === "bearish" ? "#f23645" : "#f59e0b";
@@ -29,12 +41,18 @@ export default function SMCPanel({ candles }: Props) {
       ? "#089981"
       : "#f59e0b";
 
-  const activeBullOBs = smc.orderBlocks.filter((o) => o.type === "bullish" && !o.mitigated).slice(-2);
-  const activeBearOBs = smc.orderBlocks.filter((o) => o.type === "bearish" && !o.mitigated).slice(-2);
-  const mitigatedOBs = smc.orderBlocks.filter((o) => o.mitigated).slice(-2);
+  // mitigation is now close-based → stricter → more OBs stay active, show 3
+  const activeBullOBs = smc.orderBlocks.filter((o) => o.type === "bullish" && !o.mitigated).slice(-3);
+  const activeBearOBs = smc.orderBlocks.filter((o) => o.type === "bearish" && !o.mitigated).slice(-3);
+  const mitigatedOBs  = smc.orderBlocks.filter((o) => o.mitigated).slice(-3);
 
+  // fill is now close-based → calcSMC already filtered out filled FVGs
   const bullFVGs = smc.fairValueGaps.filter((f) => f.type === "bullish").slice(-3);
   const bearFVGs = smc.fairValueGaps.filter((f) => f.type === "bearish").slice(-3);
+
+  // liquidity: split into above / below current price for clear context
+  const bslAbove = smc.buySideLiquidity.filter((p) => p > currentPrice);
+  const sslBelow = smc.sellSideLiquidity.filter((p) => p < currentPrice);
 
   return (
     <div className="smc-panel">
@@ -62,6 +80,7 @@ export default function SMCPanel({ candles }: Props) {
                 <span
                   className="smc-value"
                   style={{ color: smc.lastBOS.direction === "bullish" ? "#089981" : "#f23645" }}
+                  title={`Broke level: ${fmt(smc.lastBOS.price)}`}
                 >
                   {smc.lastBOS.direction === "bullish" ? "↑" : "↓"} {fmt(smc.lastBOS.price)}
                 </span>
@@ -75,6 +94,7 @@ export default function SMCPanel({ candles }: Props) {
                 <span
                   className="smc-value smc-choch"
                   style={{ color: smc.lastCHoCH.direction === "bullish" ? "#089981" : "#f23645" }}
+                  title={`Reversal level: ${fmt(smc.lastCHoCH.price)}`}
                 >
                   {smc.lastCHoCH.direction === "bullish" ? "↑" : "↓"} {fmt(smc.lastCHoCH.price)}
                 </span>
@@ -82,12 +102,23 @@ export default function SMCPanel({ candles }: Props) {
                 <span className="smc-value smc-none">—</span>
               )}
             </div>
+            <div className="smc-row">
+              <span className="smc-label">Price</span>
+              <span className="smc-value">{fmt(currentPrice)}</span>
+            </div>
           </div>
         </div>
 
         {/* ── Order Blocks ──────────────────────────────────── */}
         <div className="smc-card">
-          <div className="smc-card-header">Order Blocks</div>
+          <div className="smc-card-header">
+            Order Blocks
+            {activeBullOBs.length + activeBearOBs.length > 0 && (
+              <span style={{ marginLeft: "0.4rem", color: "#f59e0b" }}>
+                {activeBullOBs.length + activeBearOBs.length} active
+              </span>
+            )}
+          </div>
           <div className="smc-card-body">
             {activeBullOBs.length === 0 && activeBearOBs.length === 0 ? (
               <span className="smc-value smc-none">No active OBs</span>
@@ -98,6 +129,9 @@ export default function SMCPanel({ candles }: Props) {
                 <span className="smc-value" style={{ color: "#089981" }}>
                   {fmt(ob.low)} – {fmt(ob.high)}
                 </span>
+                <span className="smc-label" style={{ fontSize: "0.55rem" }}>
+                  {distPct(ob.high, currentPrice)} away
+                </span>
               </div>
             ))}
             {activeBearOBs.map((ob, i) => (
@@ -106,31 +140,47 @@ export default function SMCPanel({ candles }: Props) {
                 <span className="smc-value" style={{ color: "#f23645" }}>
                   {fmt(ob.low)} – {fmt(ob.high)}
                 </span>
-              </div>
-            ))}
-            {mitigatedOBs.map((ob, i) => (
-              <div key={`m${i}`} className="smc-row smc-mitigated">
-                <span className="smc-ob-tag mitigated">{ob.type === "bullish" ? "Bull" : "Bear"} OB</span>
-                <span className="smc-value">
-                  {fmt(ob.low)} – {fmt(ob.high)}
+                <span className="smc-label" style={{ fontSize: "0.55rem" }}>
+                  {distPct(ob.low, currentPrice)} away
                 </span>
               </div>
             ))}
+            {mitigatedOBs.length > 0 && (
+              <>
+                <div style={{ borderTop: "1px solid #21262d", margin: "0.2rem 0" }} />
+                {mitigatedOBs.map((ob, i) => (
+                  <div key={`m${i}`} className="smc-row smc-mitigated">
+                    <span className="smc-ob-tag mitigated">{ob.type === "bullish" ? "Bull" : "Bear"}</span>
+                    <span className="smc-value">{fmt(ob.low)} – {fmt(ob.high)}</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
 
         {/* ── Fair Value Gaps ───────────────────────────────── */}
         <div className="smc-card">
-          <div className="smc-card-header">Fair Value Gaps</div>
+          <div className="smc-card-header">
+            Fair Value Gaps
+            {bullFVGs.length + bearFVGs.length > 0 && (
+              <span style={{ marginLeft: "0.4rem", color: "#f59e0b" }}>
+                {bullFVGs.length + bearFVGs.length} open
+              </span>
+            )}
+          </div>
           <div className="smc-card-body">
             {bullFVGs.length === 0 && bearFVGs.length === 0 ? (
-              <span className="smc-value smc-none">No active FVGs</span>
+              <span className="smc-value smc-none">No open FVGs</span>
             ) : null}
             {bullFVGs.map((fvg, i) => (
               <div key={`bf${i}`} className="smc-row">
                 <span className="smc-fvg-tag bull">↑ FVG</span>
                 <span className="smc-value" style={{ color: "#089981" }}>
                   {fmt(fvg.low)} – {fmt(fvg.high)}
+                </span>
+                <span className="smc-label" style={{ fontSize: "0.55rem" }}>
+                  {gapSizePct(fvg.high, fvg.low, currentPrice)}
                 </span>
               </div>
             ))}
@@ -139,6 +189,9 @@ export default function SMCPanel({ candles }: Props) {
                 <span className="smc-fvg-tag bear">↓ FVG</span>
                 <span className="smc-value" style={{ color: "#f23645" }}>
                   {fmt(fvg.low)} – {fmt(fvg.high)}
+                </span>
+                <span className="smc-label" style={{ fontSize: "0.55rem" }}>
+                  {gapSizePct(fvg.high, fvg.low, currentPrice)}
                 </span>
               </div>
             ))}
@@ -181,43 +234,57 @@ export default function SMCPanel({ candles }: Props) {
               <span className="smc-label">Range Low</span>
               <span className="smc-value" style={{ color: "#089981" }}>{fmt(smc.rangeLow)}</span>
             </div>
+            <div className="smc-row">
+              <span className="smc-label">Position</span>
+              <span className="smc-value" style={{ color: pdColor }}>
+                {smc.premiumDiscountPct.toFixed(1)}%
+              </span>
+            </div>
           </div>
         </div>
 
         {/* ── Liquidity ─────────────────────────────────────── */}
         <div className="smc-card smc-card-wide">
           <div className="smc-card-header">Liquidity Pools</div>
-          <div className="smc-card-body">
+          <div className="smc-liq-grid">
+            {/* Buy-side: resting above current price (short sellers' stops) */}
             <div className="smc-liq-section">
               <span className="smc-liq-label bear">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polyline points="18 8 12 2 6 8" />
                 </svg>
-                BSL (Sell Stops)
+                BSL — above {fmt(currentPrice)}
               </span>
               <div className="smc-liq-levels">
-                {smc.buySideLiquidity.length === 0 ? (
+                {bslAbove.length === 0 ? (
                   <span className="smc-none">—</span>
                 ) : (
-                  smc.buySideLiquidity.map((p, i) => (
-                    <span key={i} className="smc-liq-level bear-liq">{fmt(p)}</span>
+                  bslAbove.map((p, i) => (
+                    <span key={i} className="smc-liq-level bear-liq">
+                      {fmt(p)}
+                      <span style={{ fontSize: "0.5rem", opacity: 0.6 }}>+{distPct(p, currentPrice)}</span>
+                    </span>
                   ))
                 )}
               </div>
             </div>
+            {/* Sell-side: resting below current price (long traders' stops) */}
             <div className="smc-liq-section">
               <span className="smc-liq-label bull">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polyline points="6 16 12 22 18 16" />
                 </svg>
-                SSL (Buy Stops)
+                SSL — below {fmt(currentPrice)}
               </span>
               <div className="smc-liq-levels">
-                {smc.sellSideLiquidity.length === 0 ? (
+                {sslBelow.length === 0 ? (
                   <span className="smc-none">—</span>
                 ) : (
-                  smc.sellSideLiquidity.map((p, i) => (
-                    <span key={i} className="smc-liq-level bull-liq">{fmt(p)}</span>
+                  sslBelow.map((p, i) => (
+                    <span key={i} className="smc-liq-level bull-liq">
+                      {fmt(p)}
+                      <span style={{ fontSize: "0.5rem", opacity: 0.6 }}>-{distPct(p, currentPrice)}</span>
+                    </span>
                   ))
                 )}
               </div>
