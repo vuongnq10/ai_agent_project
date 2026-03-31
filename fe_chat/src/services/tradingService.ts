@@ -11,3 +11,22 @@ export async function setLeverage(
   });
   return res.json();
 }
+
+export interface BulkLeverageResult {
+  symbol: string;
+  success: boolean;
+  leverage?: number;
+  message?: string;
+}
+
+export async function setBulkLeverage(
+  symbols: string[],
+  leverage: number
+): Promise<{ results: BulkLeverageResult[] }> {
+  const res = await fetch(`${BOT_BASE_URL}/trading/leverage/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbols, leverage }),
+  });
+  return res.json();
+}

@@ -578,6 +578,38 @@ html, body, #root {
 .leverage-status.success { color: var(--green); background: var(--green-bg); }
 .leverage-status.error { color: var(--red); background: var(--red-bg); }
 
+.leverage-coin-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  padding: 4px 0;
+}
+
+.leverage-coin-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: background var(--transition);
+}
+.leverage-coin-item:hover { background: var(--bg-hover); }
+
+.leverage-coin-name { flex: 1; }
+
+.leverage-coin-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+.leverage-coin-badge.success { color: var(--green); background: var(--green-bg); }
+.leverage-coin-badge.error { color: var(--red); background: var(--red-bg); }
+
 /* ── SMC Horizontal Strip ─────────────────────────── */
 .smc-strip {
   display: flex;

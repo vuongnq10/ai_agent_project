@@ -1,22 +1,40 @@
 import json
-import re
-from typing_extensions import TypedDict
 from typing import List
+from typing_extensions import TypedDict
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END
 from google.genai.types import Content, Part
 
 from gemini.agents_gemini.agent import Agent
-
-
 from src.tools.cx_connector import CXConnector
 
+# ---------------------------------------------------------------------------
+# Module-level singletons
+# ---------------------------------------------------------------------------
 memory = InMemorySaver()
 agent = Agent()
 cx_connector = CXConnector()
 
+# Separator appended after every streamed user_feedback chunk
+_FEEDBACK_SEPARATOR = "\n *********************** \n"
 
+# Routing map: JSON "type" value -> graph node name
+_ROUTE_MAP = {
+    "TOOL_AGENT": "tools_agent",
+    "MARKET_ANALYSIS": "analysis_agent",
+    "TRADE_DECISION": "decision_agent",
+    "GENERAL_QUERY": "master_agent",
+    "FINAL_RESPONSE": "generate_response",
+}
+
+# Fallback agent_response used when none is present in state
+_DEFAULT_RESPONSE = '{"type": "GENERAL_QUERY"}'
+
+
+# ---------------------------------------------------------------------------
+# LangGraph state
+# ---------------------------------------------------------------------------
 class MasterState(TypedDict):
     chat_history: List[Content]
     agent_response: str
@@ -26,10 +44,121 @@ class MasterState(TypedDict):
     user_feedback: str
 
 
+# ---------------------------------------------------------------------------
+# System instructions
+# ---------------------------------------------------------------------------
+_MASTER_SYSTEM_INSTRUCTION = """
+You are the Master Agent of an AI cryptocurrency trading system.
+
+The user message contains pre-computed SMC (Smart Money Concepts) indicators
+sent directly from the frontend — you do NOT need to fetch market data.
+
+Your job is to classify what the conversation needs next:
+- MARKET_ANALYSIS: Analyze the SMC indicators provided by the user.
+- TRADE_DECISION: Make a buy/sell/wait decision based on completed analysis.
+- TOOL_AGENT: Place a trade order on Binance (only after a trade is decided).
+- GENERAL_QUERY: Answer a general question that does not require analysis.
+- FINAL_RESPONSE: Deliver the final answer to the user.
+
+Standard flow for a trade request:
+1. Route to MARKET_ANALYSIS to interpret the provided indicators.
+2. Route to TRADE_DECISION once analysis is complete.
+3. If a trade is decided, route to TOOL_AGENT to place the order.
+4. Route to FINAL_RESPONSE to deliver the outcome.
+
+Respond in JSON format:
+{
+    "type": "CATEGORY",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "confidence": 0.9,
+    ... additional relevant details ...
+}
+"""
+
+_ANALYSIS_SYSTEM_INSTRUCTION = """
+You are the Analysis Agent of an AI cryptocurrency trading system.
+
+The conversation contains pre-computed SMC indicators (order blocks, FVGs,
+BOS/CHoCH, liquidity levels, swing highs/lows, EMA, RSI, Bollinger Bands, etc.)
+sent from the frontend. Do NOT request more data — analyze what is provided.
+
+Your responsibilities:
+- Identify market structure (bullish/bearish/ranging) from BOS and CHoCH signals.
+- Locate key order blocks and fair value gaps that price may react to.
+- Assess liquidity sweeps and where smart money may be targeting.
+- Evaluate EMA alignment, RSI momentum, and Bollinger Band position.
+- Determine the dominant bias and the highest-probability trade direction.
+- Suggest a specific entry zone, stop loss, and take profit based on the levels.
+
+Route your response to:
+- MARKET_ANALYSIS: If more in-depth analysis of a specific aspect is needed.
+- TRADE_DECISION: Once you have a clear directional bias and trade setup.
+- FINAL_RESPONSE: If the market is unclear and no trade setup is valid.
+
+Respond in JSON format:
+{
+    "type": "CATEGORY",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "bias": "bullish" | "bearish" | "neutral",
+    "confidence": 0.9,
+    "current_price": "30.00",
+    "entry_price": "30.10",
+    "stop_loss": "29.00",
+    "take_profit": "32.00",
+    "reasoning": "brief summary of key confluences",
+    ... additional relevant details ...
+}
+"""
+
+_DECISION_SYSTEM_INSTRUCTION = """
+You are the Decision Agent of an AI cryptocurrency trading system.
+
+You receive the analysis from the Analysis Agent and must make a final
+trading decision: BUY, SELL, or WAIT.
+
+Decision rules:
+- Only decide BUY or SELL when there are at least 2 strong confluences
+  (e.g. bullish order block + FVG fill + RSI oversold, or BOS confirmation
+  + EMA stack alignment + liquidity sweep).
+- If confluences are weak, conflicting, or market structure is unclear → WAIT.
+- Never chase price; entry must be at a defined level (order block, FVG, or
+  a retest of a broken structure level).
+- Stop loss must be placed beyond the invalidation level (below OB for longs,
+  above OB for shorts).
+- Take profit must target the next liquidity pool or significant swing level.
+
+Route your response to:
+- MARKET_ANALYSIS: If the analysis is insufficient to make a confident decision.
+- TOOL_AGENT: If placing a BUY or SELL trade (include full order details).
+- FINAL_RESPONSE: If the decision is WAIT or no valid setup exists.
+
+Respond in JSON format:
+{
+    "type": "CATEGORY",
+    "symbol": "BTCUSDT",
+    "side": "BUY" | "SELL" | "WAIT",
+    "confidence": 0.9,
+    "entry": 30.00,
+    "stop_loss": "29.00",
+    "take_profit": "32.00",
+    "reasoning": "key confluences that drove the decision",
+    ... additional relevant details ...
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
 class MasterGemini:
     def __init__(self):
         self.graph = self._build_graph()
 
+    # ------------------------------------------------------------------
+    # Graph construction
+    # ------------------------------------------------------------------
     def _build_graph(self):
         workflow = StateGraph(MasterState)
 
@@ -40,13 +169,8 @@ class MasterGemini:
         workflow.add_node("decision_agent", self._decision_agent)
         workflow.add_node("generate_response", self._generate_response)
 
-        workflow.add_conditional_edges(
-            "init_flow",
-            self._routing,
-            {
-                "master_agent": "master_agent",
-            },
-        )
+        # init_flow always proceeds to master_agent
+        workflow.add_edge("init_flow", "master_agent")
 
         workflow.add_conditional_edges(
             "master_agent",
@@ -99,305 +223,169 @@ class MasterGemini:
 
         return workflow.compile(checkpointer=memory)
 
-    def _routing(self, state: MasterState):
-        response_state = (
-            state.get("agent_response")
-            or """```json
-            {
-                "type": "GENERAL_QUERY"
-            }
-            ```"""
-        )
-
-        clean_str = response_state.strip("`json").strip("`")
-        data_obj = json.loads(clean_str)
-        type_value = data_obj.get("type", "GENERAL_QUERY")
-
-        switcher = {
-            "TOOL_AGENT": "tools_agent",
-            "MARKET_ANALYSIS": "analysis_agent",
-            "TRADE_DECISION": "decision_agent",
-            "GENERAL_QUERY": "master_agent",
-            "FINAL_RESPONSE": "generate_response",
-        }
-
+    # ------------------------------------------------------------------
+    # Router
+    # ------------------------------------------------------------------
+    def _routing(self, state: MasterState) -> str:
         if state["step_count"] >= state["max_steps"]:
-            state["user_feedback"] = "# Max steps reached, generating final response."
             return "generate_response"
-        return switcher.get(type_value, "master_agent")
 
-    def _init_flow(self, state: MasterState):
-        state["user_feedback"] = "# Start the flow"
-        return state
+        raw = state.get("agent_response") or _DEFAULT_RESPONSE
+        clean = raw.strip("`").removeprefix("json").strip()
 
-    def _call_master(self, state: MasterState):
-        state["user_feedback"] = "# Master Agent Processing: " + str(
-            state["step_count"]
-        )
-        if state["step_count"] == 0:
-            contents = [
-                Content(
-                    role="user",
-                    parts=[Part.from_text(text=state["user_prompt"])],
-                ),
-            ]
-            state["chat_history"] = contents
-        else:
-            contents = state["chat_history"] + [
-                Content(
-                    role="user", parts=[Part.from_text(text=state["agent_response"])]
-                )
-            ]
-            state["chat_history"] = contents
-
-        system_instruction = """
-            You are a Master Agent in Agentic AI assistant that analyzes user prompts for cryptocurrency trading intentions.
-            
-            Classify the user's request into one of these categories:
-            - TOOL_AGENT: Tools Agent to get market data and indicators.
-            - TOOL_AGENT: Tools Agent to create the trade setup based on analysis and decision.
-            - MARKET_ANALYSIS: Analyse Agent market conditions based on data and indicators.
-            - TRADE_DECISION: Decision Agent to buy/sell or wait based on analysis.
-            - GENERAL_QUERY: Generate the result of the prompt.
-            - FINAL_RESPONSE: Provide the final response to the user based on the analysis and decisions made by other agents.
-
-            Steps to follow:
-            1. Get the data and indicators using TOOL_AGENT if needed.
-            2. Analyze the market using MARKET_ANALYSIS if needed.
-            3. Analyze again if needed.
-            4. TOOL_AGENT can be called again if needed.
-            5. Make a trade decision using TRADE_DECISION once analysis is sufficient.
-            6. If decide to trade, use TOOL_AGENT to create the trade setup.
-            7. If no trade is to be made, respond with GENERAL_QUERY or FINAL_RESPONSE
-
-            Respond in JSON format:
-            {
-                "type": "CATEGORY", // One of the above categories
-                "symbols": "BTC/USDT",
-                "timeframes": ["1h", "4h"],
-                "confidence": 0.9,
-                ... additional relevant details ...
-            }
-            """
-
-        response = agent(contents, system_instruction=system_instruction)
-
-        print("Master Agent response:", response)
-        print("*" * 20)
-
-        serialized = self._proceed_reponse(response)
-
-        if serialized["thought"]:
-            state["user_feedback"] = serialized["thought"]
-
-        if serialized["agent_response"]:
-            state["agent_response"] = serialized["agent_response"]
-            state["chat_history"].append(
-                Content(
-                    role="user",
-                    parts=[Part.from_text(text=serialized["agent_response"])],
-                )
-            )
-
-        state["step_count"] += 1
-        return state
-
-    def _tool_agent(self, state: MasterState):
         try:
-            state["user_feedback"] = "# Tool Agent Processing: " + str(
-                state["step_count"]
-            )
-            contents = state["chat_history"]
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            return "master_agent"
 
-            response = agent(contents, tools=[cx_connector.tools])
+        type_value = data.get("type", "GENERAL_QUERY")
+        return _ROUTE_MAP.get(type_value, "master_agent")
 
-            print("Tool Agent response:", response)
-            print("*" * 20)
-
-            serialized = self._proceed_reponse(response)
-            if serialized["thought"]:
-                state["user_feedback"] = serialized["thought"]
-            if serialized["agent_response"]:
-                state["agent_response"] = serialized["agent_response"]
-                state["chat_history"].append(
-                    Content(
-                        role="user",
-                        parts=[Part.from_text(text=serialized["agent_response"])],
-                    )
-                )
-            else:
-                state["agent_response"] = ""
-
-            if response.candidates[0]:
-                parts = response.candidates[0].content.parts
-                for part in parts:
-                    if hasattr(part, "function_call") and part.function_call:
-                        func_call = part.function_call
-                        tool_name = func_call.name
-                        args = dict(func_call.args)
-
-                        tool_func = getattr(cx_connector, tool_name)
-                        tool_result = tool_func(**args)
-                        function_response = Part.from_function_response(
-                            name=tool_name,
-                            response=tool_result,
-                        )
-
-                        state["chat_history"].append(
-                            Content(role="user", parts=[function_response])
-                        )
-
-            state["step_count"] += 1
-            return state
-        except Exception as e:
-            print(f"Error loading tools: {e}")
-
-    def _analyse_agent(self, state: MasterState):
-        try:
-            state["user_feedback"] = "# Analyse Agent Processing: " + str(
-                state["step_count"]
-            )
-            contents = state["chat_history"]
-
-            system_instruction = """
-                You are a Analyse Agent in Agentic AI assistant that analyzes the data for cryptocurrency trading intentions.
-                
-                Use the data and indicators provided to analyze the market conditions.
-                Provide insights on trends, key levels, and potential trade setups.
-                Predict the price movement based on the analysis.
-                Suggest whether to buy, sell, or wait based on the analysis.
-                
-                Classify the response into one of these categories:
-                - TOOL_AGENT: Tools Agent to get market data and indicators.
-                - TOOL_AGENT: Tools Agent to create the trade setup based on analysis and decision.
-                - MARKET_ANALYSIS: Analyse Agent market conditions based on data and indicators.
-                - TRADE_DECISION: Decision Agent to buy/sell or wait based on analysis.
-                - GENERAL_QUERY: Generate the result of the prompt.
-                - FINAL_RESPONSE: Provide the final response to the user based on the analysis and decisions made by other agents.
-
-                Respond in JSON format:
-                {
-                    "type": "CATEGORY", // One of the above categories
-                    "symbols": "BTC/USDT",
-                    "timeframes": "4 hours" or "2 hours" or "1 hour",
-                    "confidence": 0.9,
-                    "current_price": "30.00",
-                    "entry_price": "30.1",
-                    "stop_loss": "29.00",
-                    "take_profit": "32.00",
-                    ... additional relevant details ...
-                }
-                """
-
-            response = agent(contents, system_instruction=system_instruction)
-
-            print("Analyse Agent response:", response)
-            print("*" * 20)
-
-            serialized = self._proceed_reponse(response)
-
-            if serialized["thought"]:
-                state["user_feedback"] = serialized["thought"]
-
-            if serialized["agent_response"]:
-                state["agent_response"] = serialized["agent_response"]
-                state["chat_history"].append(
-                    Content(
-                        role="user",
-                        parts=[Part.from_text(text=serialized["agent_response"])],
-                    )
-                )
-
-            state["step_count"] += 1
-            return state
-        except Exception as e:
-            print(f"Error in Analyse Agent: {e}")
-
-    def _decision_agent(self, state: MasterState):
-        try:
-            state["user_feedback"] = "# Decision Agent Processing: " + str(
-                state["step_count"]
-            )
-            contents = state["chat_history"]
-
-            system_instruction = """
-                You are a Decision Agent in Agentic AI assistant that analyzes the data for cryptocurrency trading intentions.
-                
-                Use the insight of the analysis provided to make a decision on trading actions.
-                Decide whether to buy, sell, or wait based on the analysis.
-                If more analysis or data is needed, request it using MARKET_ANALYSIS or TOOL_AGENT.
-                If decide to trade, provide a detailed trade setup including entry, stop loss, and take profit levels then call the TOOL_AGENT to execute the trade setup.
-                If no trade is to be made, respond with GENERAL_QUERY or FINAL_RESPONSE
-
-                Classify the response into one of these categories:
-                - TOOL_AGENT: Tools Agent to get market data and indicators.
-                - TOOL_AGENT: Tools Agent to create the trade setup based on analysis and decision.
-                - MARKET_ANALYSIS: Analyse Agent market conditions based on data and indicators.
-                - TRADE_DECISION: Decision Agent to buy/sell or wait based on analysis.
-                - GENERAL_QUERY: Generate the result of the prompt.
-                - FINAL_RESPONSE: Provide the final response to the user based on the analysis and decisions made by other agents.
-
-                Respond in JSON format:
-                {
-                    "type": "CATEGORY", // One of the above categories
-                    "symbols": "BTC/USDT",
-                    "timeframes": ["1h", "4h"],
-                    "confidence": 0.9,
-                    "entry_price": "30.00",
-                    "stop_loss": "29.00",
-                    "take_profit": "32.00",
-                    ... additional relevant details ...
-                }
-                """
-
-            response = agent(contents, system_instruction=system_instruction)
-
-            print("Decision Agent response:", response)
-            print("*" * 20)
-
-            serialized = self._proceed_reponse(response)
-
-            if serialized["thought"]:
-                state["user_feedback"] = serialized["thought"]
-
-            if serialized["agent_response"]:
-                state["agent_response"] = serialized["agent_response"]
-                state["chat_history"].append(
-                    Content(
-                        role="user",
-                        parts=[Part.from_text(text=serialized["agent_response"])],
-                    )
-                )
-
-            state["step_count"] += 1
-            return state
-        except Exception as e:
-            print(f"Error in Decision Agent: {e}")
-
-    def _generate_response(self, state: MasterState):
-        state["user_feedback"] = ""
-        return state
-
-    def _proceed_reponse(self, response):
+    # ------------------------------------------------------------------
+    # Helper: parse thought + response text out of a Gemini response
+    # ------------------------------------------------------------------
+    def _parse_response(self, response) -> dict:
+        """Return ``{"thought": str, "agent_response": str}`` from a Gemini response."""
         parts = response.candidates[0].content.parts
 
-        agent_response = ""
         thought = ""
-
-        if hasattr(response, "text"):
-            agent_response = response.text
+        agent_response = ""
 
         for part in parts:
             if hasattr(part, "thought") and part.thought:
                 thought = part.text.rstrip()
+            else:
+                agent_response += part.text if hasattr(part, "text") and part.text else ""
 
-        return {
-            "thought": str(thought),
-            "agent_response": agent_response,
-        }
+        return {"thought": thought, "agent_response": agent_response.strip()}
 
-    def __call__(self, prompt: str, session_id="default_session"):
-        initial_state = {
+    # ------------------------------------------------------------------
+    # Helper: apply parsed response fields back onto state
+    # ------------------------------------------------------------------
+    def _apply_parsed_response(self, state: MasterState, parsed: dict) -> None:
+        """Mutate *state* in-place with thought and agent_response from *parsed*."""
+        if parsed["thought"]:
+            state["user_feedback"] = parsed["thought"]
+        if parsed["agent_response"]:
+            state["agent_response"] = parsed["agent_response"]
+            state["chat_history"].append(
+                Content(
+                    role="user",
+                    parts=[Part.from_text(text=parsed["agent_response"])],
+                )
+            )
+
+    # ------------------------------------------------------------------
+    # Nodes
+    # ------------------------------------------------------------------
+    def _init_flow(self, state: MasterState) -> MasterState:
+        state["user_feedback"] = "# Starting flow"
+        return state
+
+    def _call_master(self, state: MasterState) -> MasterState:
+        state["user_feedback"] = f"# Master Agent — step {state['step_count']}"
+
+        if state["step_count"] == 0:
+            state["chat_history"] = [
+                Content(role="user", parts=[Part.from_text(text=state["user_prompt"])])
+            ]
+        else:
+            state["chat_history"].append(
+                Content(role="user", parts=[Part.from_text(text=state["agent_response"])])
+            )
+
+        response = agent(state["chat_history"], system_instruction=_MASTER_SYSTEM_INSTRUCTION)
+        print("Master Agent response:", response)
+        print("*" * 20)
+
+        self._apply_parsed_response(state, self._parse_response(response))
+        state["step_count"] += 1
+        return state
+
+    def _tool_agent(self, state: MasterState) -> MasterState:
+        try:
+            state["user_feedback"] = f"# Tool Agent — step {state['step_count']}"
+
+            response = agent(state["chat_history"], tools=[cx_connector.tools])
+            print("Tool Agent response:", response)
+            print("*" * 20)
+
+            parsed = self._parse_response(response)
+            self._apply_parsed_response(state, parsed)
+
+            if not parsed["agent_response"]:
+                state["agent_response"] = ""
+
+            # Execute any function calls returned by the model
+            candidate = response.candidates[0]
+            for part in candidate.content.parts:
+                if hasattr(part, "function_call") and part.function_call:
+                    func_call = part.function_call
+                    tool_func = getattr(cx_connector, func_call.name)
+                    tool_result = tool_func(**dict(func_call.args))
+                    state["chat_history"].append(
+                        Content(
+                            role="user",
+                            parts=[
+                                Part.from_function_response(
+                                    name=func_call.name,
+                                    response=tool_result,
+                                )
+                            ],
+                        )
+                    )
+
+            state["step_count"] += 1
+            return state
+        except Exception as e:
+            print(f"Error in Tool Agent: {e}")
+            return state
+
+    def _analyse_agent(self, state: MasterState) -> MasterState:
+        try:
+            state["user_feedback"] = f"# Analysis Agent — step {state['step_count']}"
+
+            response = agent(
+                state["chat_history"],
+                system_instruction=_ANALYSIS_SYSTEM_INSTRUCTION,
+            )
+            print("Analysis Agent response:", response)
+            print("*" * 20)
+
+            self._apply_parsed_response(state, self._parse_response(response))
+            state["step_count"] += 1
+            return state
+        except Exception as e:
+            print(f"Error in Analysis Agent: {e}")
+            return state
+
+    def _decision_agent(self, state: MasterState) -> MasterState:
+        try:
+            state["user_feedback"] = f"# Decision Agent — step {state['step_count']}"
+
+            response = agent(
+                state["chat_history"],
+                system_instruction=_DECISION_SYSTEM_INSTRUCTION,
+            )
+            print("Decision Agent response:", response)
+            print("*" * 20)
+
+            self._apply_parsed_response(state, self._parse_response(response))
+            state["step_count"] += 1
+            return state
+        except Exception as e:
+            print(f"Error in Decision Agent: {e}")
+            return state
+
+    def _generate_response(self, state: MasterState) -> MasterState:
+        state["user_feedback"] = ""
+        return state
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+    def __call__(self, prompt: str, session_id: str = "default_session"):
+        initial_state: MasterState = {
             "agent_response": "",
             "chat_history": [],
             "user_prompt": prompt,
@@ -405,105 +393,17 @@ class MasterGemini:
             "max_steps": 10,
             "user_feedback": "",
         }
-        config = {"configurable": {"thread_id": session_id}}
+        graph_config = {"configurable": {"thread_id": session_id}}
 
-        events = self.graph.stream(initial_state, config=config, stream_mode="values")
-
-        for event in events:
+        for event in self.graph.stream(initial_state, config=graph_config, stream_mode="values"):
             try:
                 print("Event:", event)
-                if event.get("user_feedback"):
-
+                feedback = event.get("user_feedback")
+                if feedback:
                     print("#" * 20)
-                    print(event["user_feedback"])
+                    print(feedback)
                     print("#" * 20)
-
-                    response_text = (
-                        event["user_feedback"] + "\n *********************** \n"
-                    )
-                    yield response_text
+                    yield feedback + _FEEDBACK_SEPARATOR
             except Exception as e:
                 print(f"Error in streaming: {e}")
                 yield f"Error in streaming: {e}"
-
-
-data_json = [
-    {
-        "clientOrderId": "ehuV8PWqrJ8BsJUPdUtufc",
-        "cumQty": "0",
-        "cumQuote": "0.00000",
-        "executedQty": "0",
-        "orderId": 21706398901,
-        "avgPrice": "0.00",
-        "origQty": "725",
-        "price": "0.27600",
-        "reduceOnly": False,
-        "side": "SELL",
-        "positionSide": "BOTH",
-        "status": "NEW",
-        "stopPrice": "0.00000",
-        "symbol": "SANDUSDT",
-        "timeInForce": "GTC",
-        "type": "LIMIT",
-        "origType": "LIMIT",
-        "updateTime": 1759970730664,
-        "workingType": "CONTRACT_PRICE",
-        "priceProtect": False,
-        "priceMatch": "NONE",
-        "selfTradePreventionMode": "EXPIRE_MAKER",
-        "goodTillDate": 0,
-        "additional_properties": {},
-    },
-    {
-        "clientOrderId": "Lgr4pqXgihHJWMTFshXt4E",
-        "cumQty": "0",
-        "cumQuote": "0.00000",
-        "executedQty": "0",
-        "orderId": 21706398902,
-        "avgPrice": "0.00",
-        "origQty": "0",
-        "price": "0.00000",
-        "reduceOnly": True,
-        "side": "BUY",
-        "positionSide": "BOTH",
-        "status": "NEW",
-        "stopPrice": "0.26910",
-        "symbol": "SANDUSDT",
-        "timeInForce": "GTC",
-        "type": "TAKE_PROFIT_MARKET",
-        "origType": "TAKE_PROFIT_MARKET",
-        "updateTime": 1759970730664,
-        "workingType": "CONTRACT_PRICE",
-        "priceProtect": False,
-        "priceMatch": "NONE",
-        "selfTradePreventionMode": "EXPIRE_MAKER",
-        "goodTillDate": 0,
-        "additional_properties": {},
-    },
-    {
-        "clientOrderId": "8OMFeH5YCKV1KZChU3X7YZ",
-        "cumQty": "0",
-        "cumQuote": "0.00000",
-        "executedQty": "0",
-        "orderId": 21706398900,
-        "avgPrice": "0.00",
-        "origQty": "0",
-        "price": "0.00000",
-        "reduceOnly": True,
-        "side": "BUY",
-        "positionSide": "BOTH",
-        "status": "NEW",
-        "stopPrice": "0.28290",
-        "symbol": "SANDUSDT",
-        "timeInForce": "GTC",
-        "type": "STOP_MARKET",
-        "origType": "STOP_MARKET",
-        "updateTime": 1759970730664,
-        "workingType": "CONTRACT_PRICE",
-        "priceProtect": False,
-        "priceMatch": "NONE",
-        "selfTradePreventionMode": "EXPIRE_MAKER",
-        "goodTillDate": 0,
-        "additional_properties": {},
-    },
-]

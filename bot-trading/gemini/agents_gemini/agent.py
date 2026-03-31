@@ -1,5 +1,3 @@
-import os
-
 from google.genai import Client
 from google.genai.types import (
     HttpOptions,
@@ -9,14 +7,18 @@ from google.genai.types import (
 import config
 
 GEMINI_MODEL = "gemini-2.5-flash"
-API_KEY = config.API_KEY
-client = Client(api_key=API_KEY, http_options=HttpOptions(api_version="v1alpha"))
+
+_client = Client(
+    api_key=config.API_KEY,
+    http_options=HttpOptions(api_version="v1alpha"),
+)
 
 
 class Agent:
-    def __call__(self, contents, tools=None, system_instruction=None):
+    """Thin wrapper around the Gemini generate_content API."""
 
-        response = client.models.generate_content(
+    def __call__(self, contents, tools=None, system_instruction=None):
+        response = _client.models.generate_content(
             model=GEMINI_MODEL,
             contents=contents,
             config=GenerateContentConfig(

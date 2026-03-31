@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 from src.binance_connector.binance import BinanceConnector
@@ -7,6 +8,11 @@ trading = APIRouter()
 
 class LeverageRequest(BaseModel):
     symbol: str
+    leverage: int
+
+
+class BulkLeverageRequest(BaseModel):
+    symbols: List[str]
     leverage: int
 
 
@@ -20,3 +26,19 @@ async def change_leverage(request: LeverageRequest):
         return {"success": True, "data": result}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@trading.post("/leverage/bulk")
+async def change_leverage_bulk(request: BulkLeverageRequest):
+    connector = BinanceConnector()
+    results = []
+    for symbol in request.symbols:
+        try:
+            data = connector.set_leverage(symbol, request.leverage)
+            if data is None:
+                results.append({"symbol": symbol, "success": False, "message": "Failed to set leverage"})
+            else:
+                results.append({"symbol": symbol, "success": True, "leverage": data.get("leverage", request.leverage)})
+        except Exception as e:
+            results.append({"symbol": symbol, "success": False, "message": str(e)})
+    return {"results": results}
