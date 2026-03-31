@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Candle } from "../App/types";
-import type { Timeframe } from "../App/ChartPanel/TimeframeSelector";
+import type { Timeframe } from "../constants";
 import { fetchCandles as fetchCandlesService } from "../services/binanceService";
 
 export function useCandles(symbol: string) {
