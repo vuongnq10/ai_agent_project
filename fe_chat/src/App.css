@@ -1086,6 +1086,31 @@ html, body, #root {
 .send-button:hover:not(:disabled) { background: #7dd3fc; }
 .send-button:disabled { background: var(--bg-active); cursor: not-allowed; color: var(--text-disabled); }
 
+.quick-smc-button {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 12px;
+  background: linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%);
+  border: 1px solid #2d6a9f;
+  border-radius: var(--radius-sm);
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: left;
+}
+.quick-smc-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2a4d7a 0%, #1a3a60 100%);
+  border-color: #7dd3fc;
+  color: #bae6fd;
+}
+.quick-smc-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Indicator Chart (RSI) ────────────────────────── */
 .indicator-charts {
   flex-shrink: 0;

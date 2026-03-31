@@ -85,6 +85,7 @@ export default function App() {
           <Input
             message={message}
             loading={loading}
+            selectedCoin={selectedCoin}
             onChange={setMessage}
             onSubmit={handleSubmit}
           />

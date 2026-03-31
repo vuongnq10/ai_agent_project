@@ -30,7 +30,7 @@ configuration = ConfigurationRestAPI(
 LEVERAGE = 20
 ORDER_AMOUNT = 5
 EXPECTED_PROFIT = 0.40
-EXPECTED_STOP_LOSS = 0.75
+EXPECTED_STOP_LOSS = 0.30
 
 
 class BinanceConnector:
@@ -156,12 +156,12 @@ class BinanceConnector:
 
             print(f"Creating orders: {orders}")
 
-            response = self.client.rest_api.place_multiple_orders(orders)
+            # response = self.client.rest_api.place_multiple_orders(orders)
 
-            data = response.data()
-            result = [item.to_dict() for item in data]
+            # data = response.data()
+            # result = [item.to_dict() for item in data]
 
-            asyncio.create_task(telegram_bot(result))
+            # asyncio.create_task(telegram_bot(result))
 
             asyncio.create_task(
                 telegram_bot(
