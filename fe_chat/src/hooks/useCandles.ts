@@ -3,8 +3,7 @@ import type { Candle } from "../App/types";
 import type { Timeframe } from "../constants";
 import { fetchCandles as fetchCandlesService } from "../services/binanceService";
 
-export function useCandles(symbol: string) {
-  const [timeframe, setTimeframe] = useState<Timeframe>("1h");
+export function useCandles(symbol: string, timeframe: Timeframe) {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -26,5 +25,5 @@ export function useCandles(symbol: string) {
     return () => clearInterval(interval);
   }, [symbol, timeframe, load]);
 
-  return { candles, loading, timeframe, setTimeframe };
+  return { candles, loading };
 }

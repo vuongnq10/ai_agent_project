@@ -10,15 +10,17 @@ import { useCandles } from "../../hooks/useCandles";
 
 interface Props {
   symbol: string;
+  timeframe: Timeframe;
+  onTimeframeChange: (tf: Timeframe) => void;
   onAnalyze: (symbol: string, timeframe: Timeframe) => void;
 }
 
 const DEFAULT_ACTIVE = new Set<IndicatorId>(["ema9", "ema20", "ema50", "bb", "rsi"]);
 
-export default function ChartPanel({ symbol, onAnalyze }: Props) {
+export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAnalyze }: Props) {
   const [smcMode, setSmcMode] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(DEFAULT_ACTIVE);
-  const { candles, loading, timeframe, setTimeframe } = useCandles(symbol);
+  const { candles, loading } = useCandles(symbol, timeframe);
   const smcData = useMemo(() => calcSMC(candles), [candles]);
 
   const toggleIndicator = (id: IndicatorId, checked: boolean) => {
@@ -30,7 +32,6 @@ export default function ChartPanel({ symbol, onAnalyze }: Props) {
     });
   };
 
-  // Active overlay indicators for the legend strip
   const activeLegend = INDICATORS.filter(
     (i) => i.group === "overlay" && activeIndicators.has(i.id)
   );
@@ -40,7 +41,7 @@ export default function ChartPanel({ symbol, onAnalyze }: Props) {
       <div className="chart-toolbar">
         <MarketBar symbol={symbol} />
         <div className="chart-toolbar-right">
-          <TimeframeSelector value={timeframe} onChange={setTimeframe} />
+          <TimeframeSelector value={timeframe} onChange={onTimeframeChange} />
           <IndicatorPicker active={activeIndicators} onChange={toggleIndicator} />
           <label className="smc-toggle" title={smcMode ? "Switch to Classic" : "Switch to SMC"}>
             <input
