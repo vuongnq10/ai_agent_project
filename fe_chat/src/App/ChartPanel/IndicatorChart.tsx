@@ -35,13 +35,13 @@ export default function IndicatorChart({ candles }: Props) {
     );
     // overbought / oversold reference lines
     const ob = rsiChart.addSeries(LineSeries, {
-      color: "rgba(239,68,68,0.4)",
+      color: "rgba(242,54,69,0.4)",
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
     });
     const os = rsiChart.addSeries(LineSeries, {
-      color: "rgba(34,197,94,0.4)",
+      color: "rgba(8,153,129,0.4)",
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -84,7 +84,7 @@ export default function IndicatorChart({ candles }: Props) {
         .map((c, i) => ({
           time: c.time as any,
           value: histogram[i],
-          color: (histogram[i] ?? 0) >= 0 ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)",
+          color: (histogram[i] ?? 0) >= 0 ? "rgba(8,153,129,0.5)" : "rgba(242,54,69,0.5)",
         }))
         .filter((d) => d.value != null) as any
     );

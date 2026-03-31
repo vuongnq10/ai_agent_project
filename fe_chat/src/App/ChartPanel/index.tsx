@@ -1,15 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import type { Candle } from "../types";
+import { useState, useMemo } from "react";
 import { calcSMC } from "../indicators";
 import MarketBar from "./MarketBar";
 import CandleChart from "./CandleChart";
 import IndicatorChart from "./IndicatorChart";
 import SMCPanel from "./SMCPanel";
 import TimeframeSelector, { type Timeframe } from "./TimeframeSelector";
-
-const TF_MAP: Record<Timeframe, string> = {
-  "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1h", "4h": "4h", "1d": "1d",
-};
+import { useCandles } from "../../hooks/useCandles";
 
 interface Props {
   symbol: string;
@@ -17,41 +13,8 @@ interface Props {
 }
 
 export default function ChartPanel({ symbol, onAnalyze }: Props) {
-  const [timeframe, setTimeframe] = useState<Timeframe>("1h");
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [loading, setLoading] = useState(false);
   const [smcMode, setSmcMode] = useState(false);
-
-  const fetchCandles = useCallback(async (sym: string, tf: Timeframe) => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${TF_MAP[tf]}&limit=300`
-      );
-      const raw: [number, string, string, string, string, string][] = await res.json();
-      setCandles(
-        raw.map((k) => ({
-          time: Math.floor(k[0] / 1000),
-          open: parseFloat(k[1]),
-          high: parseFloat(k[2]),
-          low: parseFloat(k[3]),
-          close: parseFloat(k[4]),
-          volume: parseFloat(k[5]),
-        }))
-      );
-    } catch (e) {
-      console.error("Failed to fetch candles", e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCandles(symbol, timeframe);
-    const interval = setInterval(() => fetchCandles(symbol, timeframe), 30000);
-    return () => clearInterval(interval);
-  }, [symbol, timeframe, fetchCandles]);
-
+  const { candles, loading, timeframe, setTimeframe } = useCandles(symbol);
   const smcData = useMemo(() => calcSMC(candles), [candles]);
 
   return (
@@ -80,13 +43,7 @@ export default function ChartPanel({ symbol, onAnalyze }: Props) {
         <div className="chart-loading">Loading chart data...</div>
       ) : (
         <>
-          <CandleChart
-            candles={candles}
-            height={360}
-            smcMode={smcMode}
-            smcData={smcData}
-          />
-
+          <CandleChart candles={candles} height={360} smcMode={smcMode} smcData={smcData} />
           <div className="chart-legend">
             <span className="legend-item ema9">EMA 9</span>
             <span className="legend-item ema20">EMA 20</span>
@@ -94,7 +51,6 @@ export default function ChartPanel({ symbol, onAnalyze }: Props) {
             <span className="legend-item bb">BB (20,2)</span>
           </div>
           <IndicatorChart candles={candles} />
-
           <SMCPanel candles={candles} />
         </>
       )}

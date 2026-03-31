@@ -27,15 +27,38 @@ You are the **frontend agent** for this AI trading bot. You work exclusively in 
 ```
 fe_chat/
 ├── src/
-│   ├── main.tsx           # React entry point, renders <App />
-│   ├── AppStream.tsx      # Main app component (chat UI + SSE)
-│   ├── App.css            # All component styles
-│   ├── coins.ts           # Supported coin symbols for sidebar
-│   └── assets/
-├── public/
+│   ├── main.tsx                    # React entry point, renders <App />
+│   ├── App.css                     # All component styles
+│   ├── index.css                   # Global base styles
+│   ├── coins.ts                    # Supported coin symbols for sidebar
+│   ├── vite-env.d.ts
+│   ├── assets/
+│   └── App/
+│       ├── index.tsx               # Main app component (chat UI + SSE)
+│       ├── types.ts                # Shared TypeScript types
+│       ├── indicators.ts           # Indicator definitions/config
+│       ├── smcDrawings.ts          # SMC drawing helpers for chart
+│       ├── ChartPanel/
+│       │   ├── index.tsx           # Chart panel layout
+│       │   ├── CandleChart.tsx     # Candlestick chart component
+│       │   ├── IndicatorChart.tsx  # Indicator sub-chart component
+│       │   ├── MarketBar.tsx       # Market info bar
+│       │   ├── SMCPanel.tsx        # SMC overlay panel
+│       │   └── TimeframeSelector.tsx
+│       ├── ChatInput/
+│       │   └── index.tsx           # Chat input field + submit
+│       ├── ChatMessages/
+│       │   └── index.tsx           # Chat message list
+│       ├── Header/
+│       │   └── index.tsx           # Top header bar
+│       └── Sidebar/
+│           ├── index.tsx           # Sidebar layout
+│           ├── CoinList.tsx        # Coin chip list
+│           └── LeveragePanel.tsx   # Leverage selector
+├── dist/                           # Production build output
 ├── index.html
 ├── vite.config.ts
-├── tsconfig.json / tsconfig.app.json / tsconfig.node.json
+├── tsconfig.app.json / tsconfig.node.json
 ├── eslint.config.js
 └── package.json
 ```

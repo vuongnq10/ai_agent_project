@@ -1,37 +1,11 @@
-import { useEffect, useState } from "react";
-import type { Ticker } from "../types";
+import { useTicker } from "../../hooks/useTicker";
 
 interface Props {
   symbol: string;
 }
 
 export default function MarketBar({ symbol }: Props) {
-  const [ticker, setTicker] = useState<Ticker | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchTicker() {
-      try {
-        const res = await fetch(
-          `https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`
-        );
-        const data = await res.json();
-        if (!cancelled) {
-          setTicker({
-            price: parseFloat(data.lastPrice),
-            change: parseFloat(data.priceChange),
-            changePercent: parseFloat(data.priceChangePercent),
-            high: parseFloat(data.highPrice),
-            low: parseFloat(data.lowPrice),
-            volume: parseFloat(data.quoteVolume),
-          });
-        }
-      } catch {}
-    }
-    fetchTicker();
-    const interval = setInterval(fetchTicker, 5000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [symbol]);
+  const ticker = useTicker(symbol);
 
   if (!ticker) return <div className="market-bar market-bar-loading">Loading...</div>;
 

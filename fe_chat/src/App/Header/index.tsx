@@ -10,8 +10,8 @@ export default function Header({ onClearChat, selectedCoin }: Props) {
       <div className="header-left">
         <div className="app-logo">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path d="M3 3v18h18" stroke="#22c55e" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M7 12l3-3 4 4 5-5" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M3 3v18h18" stroke="#089981" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M7 12l3-3 4 4 5-5" stroke="#089981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
         <span className="app-title">CryptoAI</span>

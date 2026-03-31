@@ -48,12 +48,12 @@ export default function CandleChart({
 
     // ── Candlestick ──────────────────────────────────────────────────────────
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderUpColor: "#22c55e",
-      borderDownColor: "#ef4444",
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
+      upColor: "#089981",
+      downColor: "#f23645",
+      borderUpColor: "#089981",
+      borderDownColor: "#f23645",
+      wickUpColor: "#089981",
+      wickDownColor: "#f23645",
     });
     candleSeries.setData(
       candles.map((c) => ({
@@ -75,7 +75,7 @@ export default function CandleChart({
       candles.map((c) => ({
         time: c.time as any,
         value: c.volume,
-        color: c.close >= c.open ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)",
+        color: c.close >= c.open ? "rgba(8,153,129,0.35)" : "rgba(242,54,69,0.35)",
       }))
     );
 
@@ -122,8 +122,8 @@ export default function CandleChart({
               timeTo: lastTime,
               priceHigh: ob.high,
               priceLow: ob.low,
-              fillColor: isBull ? "rgba(34,197,94,0.13)" : "rgba(239,68,68,0.13)",
-              borderColor: isBull ? "#22c55e" : "#ef4444",
+              fillColor: isBull ? "rgba(8,153,129,0.13)" : "rgba(242,54,69,0.13)",
+              borderColor: isBull ? "#089981" : "#f23645",
               lineWidth: 1,
               label: isBull ? "Bull OB" : "Bear OB",
             })
@@ -136,8 +136,8 @@ export default function CandleChart({
               timeTo: lastTime,
               priceHigh: ob.high,
               priceLow: ob.low,
-              fillColor: isBull ? "rgba(34,197,94,0.04)" : "rgba(239,68,68,0.04)",
-              borderColor: isBull ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)",
+              fillColor: isBull ? "rgba(8,153,129,0.04)" : "rgba(242,54,69,0.04)",
+              borderColor: isBull ? "rgba(8,153,129,0.35)" : "rgba(242,54,69,0.35)",
               lineWidth: 1,
               lineDash: [3, 3],
             })
@@ -179,7 +179,7 @@ export default function CandleChart({
             new HLinePrimitive({
               timeFrom: candles[swing.index].time as any,
               price: smcData.lastBOS.price,
-              color: isBull ? "#22c55e" : "#ef4444",
+              color: isBull ? "#089981" : "#f23645",
               lineWidth: 1.5,
               lineDash: [6, 3],
               label: "BOS",
@@ -226,7 +226,7 @@ export default function CandleChart({
       for (const level of smcData.buySideLiquidity.slice(0, 3)) {
         candleSeries.createPriceLine({
           price: level,
-          color: "rgba(239,68,68,0.5)",
+          color: "rgba(242,54,69,0.5)",
           lineWidth: 1,
           lineStyle: LineStyle.Dotted,
           axisLabelVisible: true,
@@ -236,7 +236,7 @@ export default function CandleChart({
       for (const level of smcData.sellSideLiquidity.slice(0, 3)) {
         candleSeries.createPriceLine({
           price: level,
-          color: "rgba(34,197,94,0.5)",
+          color: "rgba(8,153,129,0.5)",
           lineWidth: 1,
           lineStyle: LineStyle.Dotted,
           axisLabelVisible: true,
@@ -259,7 +259,7 @@ export default function CandleChart({
           markers.push({
             time: candles[sh.index].time as any,
             position: "aboveBar",
-            color: "rgba(239,68,68,0.75)",
+            color: "rgba(242,54,69,0.75)",
             shape: "circle",
             size: 0.5,
             text: "",
@@ -271,7 +271,7 @@ export default function CandleChart({
           markers.push({
             time: candles[sl.index].time as any,
             position: "belowBar",
-            color: "rgba(34,197,94,0.75)",
+            color: "rgba(8,153,129,0.75)",
             shape: "circle",
             size: 0.5,
             text: "",
@@ -292,7 +292,7 @@ export default function CandleChart({
           markers.push({
             time: candles[swing.index].time as any,
             position: smcData.lastBOS.direction === "bullish" ? "aboveBar" : "belowBar",
-            color: smcData.lastBOS.direction === "bullish" ? "#22c55e" : "#ef4444",
+            color: smcData.lastBOS.direction === "bullish" ? "#089981" : "#f23645",
             shape: smcData.lastBOS.direction === "bullish" ? "arrowUp" : "arrowDown",
             size: 1.5,
             text: "BOS",
@@ -348,9 +348,9 @@ export default function CandleChart({
       const el = document.createElement("div");
       el.style.cssText = [
         "position:absolute",
-        `background:${isHigh ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)"}`,
-        `border:1px solid ${isHigh ? "rgba(34,197,94,0.7)" : "rgba(239,68,68,0.7)"}`,
-        `color:${isHigh ? "#4ade80" : "#f87171"}`,
+        `background:${isHigh ? "rgba(8,153,129,0.15)" : "rgba(242,54,69,0.15)"}`,
+        `border:1px solid ${isHigh ? "rgba(8,153,129,0.7)" : "rgba(242,54,69,0.7)"}`,
+        `color:${isHigh ? "#0ecaa8" : "#f56e7a"}`,
         "font-size:10px",
         "font-family:monospace",
         "padding:1px 5px",

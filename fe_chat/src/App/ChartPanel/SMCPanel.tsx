@@ -18,15 +18,15 @@ export default function SMCPanel({ candles }: Props) {
   if (candles.length === 0) return null;
 
   const trendColor =
-    smc.trend === "bullish" ? "#22c55e" : smc.trend === "bearish" ? "#ef4444" : "#f59e0b";
+    smc.trend === "bullish" ? "#089981" : smc.trend === "bearish" ? "#f23645" : "#f59e0b";
   const trendArrow =
     smc.trend === "bullish" ? "↑" : smc.trend === "bearish" ? "↓" : "→";
 
   const pdColor =
     smc.premiumDiscountZone === "premium"
-      ? "#ef4444"
+      ? "#f23645"
       : smc.premiumDiscountZone === "discount"
-      ? "#22c55e"
+      ? "#089981"
       : "#f59e0b";
 
   const activeBullOBs = smc.orderBlocks.filter((o) => o.type === "bullish" && !o.mitigated).slice(-2);
@@ -61,7 +61,7 @@ export default function SMCPanel({ candles }: Props) {
               {smc.lastBOS ? (
                 <span
                   className="smc-value"
-                  style={{ color: smc.lastBOS.direction === "bullish" ? "#22c55e" : "#ef4444" }}
+                  style={{ color: smc.lastBOS.direction === "bullish" ? "#089981" : "#f23645" }}
                 >
                   {smc.lastBOS.direction === "bullish" ? "↑" : "↓"} {fmt(smc.lastBOS.price)}
                 </span>
@@ -74,7 +74,7 @@ export default function SMCPanel({ candles }: Props) {
               {smc.lastCHoCH ? (
                 <span
                   className="smc-value smc-choch"
-                  style={{ color: smc.lastCHoCH.direction === "bullish" ? "#22c55e" : "#ef4444" }}
+                  style={{ color: smc.lastCHoCH.direction === "bullish" ? "#089981" : "#f23645" }}
                 >
                   {smc.lastCHoCH.direction === "bullish" ? "↑" : "↓"} {fmt(smc.lastCHoCH.price)}
                 </span>
@@ -95,7 +95,7 @@ export default function SMCPanel({ candles }: Props) {
             {activeBullOBs.map((ob, i) => (
               <div key={`b${i}`} className="smc-row">
                 <span className="smc-ob-tag bull">Bull OB</span>
-                <span className="smc-value" style={{ color: "#22c55e" }}>
+                <span className="smc-value" style={{ color: "#089981" }}>
                   {fmt(ob.low)} – {fmt(ob.high)}
                 </span>
               </div>
@@ -103,7 +103,7 @@ export default function SMCPanel({ candles }: Props) {
             {activeBearOBs.map((ob, i) => (
               <div key={`s${i}`} className="smc-row">
                 <span className="smc-ob-tag bear">Bear OB</span>
-                <span className="smc-value" style={{ color: "#ef4444" }}>
+                <span className="smc-value" style={{ color: "#f23645" }}>
                   {fmt(ob.low)} – {fmt(ob.high)}
                 </span>
               </div>
@@ -129,7 +129,7 @@ export default function SMCPanel({ candles }: Props) {
             {bullFVGs.map((fvg, i) => (
               <div key={`bf${i}`} className="smc-row">
                 <span className="smc-fvg-tag bull">↑ FVG</span>
-                <span className="smc-value" style={{ color: "#22c55e" }}>
+                <span className="smc-value" style={{ color: "#089981" }}>
                   {fmt(fvg.low)} – {fmt(fvg.high)}
                 </span>
               </div>
@@ -137,7 +137,7 @@ export default function SMCPanel({ candles }: Props) {
             {bearFVGs.map((fvg, i) => (
               <div key={`sf${i}`} className="smc-row">
                 <span className="smc-fvg-tag bear">↓ FVG</span>
-                <span className="smc-value" style={{ color: "#ef4444" }}>
+                <span className="smc-value" style={{ color: "#f23645" }}>
                   {fmt(fvg.low)} – {fmt(fvg.high)}
                 </span>
               </div>
@@ -171,7 +171,7 @@ export default function SMCPanel({ candles }: Props) {
             </div>
             <div className="smc-row">
               <span className="smc-label">Range High</span>
-              <span className="smc-value" style={{ color: "#ef4444" }}>{fmt(smc.rangeHigh)}</span>
+              <span className="smc-value" style={{ color: "#f23645" }}>{fmt(smc.rangeHigh)}</span>
             </div>
             <div className="smc-row">
               <span className="smc-label">Equilibrium</span>
@@ -179,7 +179,7 @@ export default function SMCPanel({ candles }: Props) {
             </div>
             <div className="smc-row">
               <span className="smc-label">Range Low</span>
-              <span className="smc-value" style={{ color: "#22c55e" }}>{fmt(smc.rangeLow)}</span>
+              <span className="smc-value" style={{ color: "#089981" }}>{fmt(smc.rangeLow)}</span>
             </div>
           </div>
         </div>
