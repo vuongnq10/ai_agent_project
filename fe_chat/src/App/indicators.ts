@@ -257,6 +257,22 @@ export function calcRSI(closes: number[], period = 14): (number | null)[] {
   return result;
 }
 
+export function calcATR(candles: { high: number; low: number; close: number }[], period = 14): number {
+  if (candles.length < period + 1) return 0;
+  const trs: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    const hl = candles[i].high - candles[i].low;
+    const hpc = Math.abs(candles[i].high - candles[i - 1].close);
+    const lpc = Math.abs(candles[i].low - candles[i - 1].close);
+    trs.push(Math.max(hl, hpc, lpc));
+  }
+  let atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < trs.length; i++) {
+    atr = (atr * (period - 1) + trs[i]) / period;
+  }
+  return atr;
+}
+
 export function calcMACD(closes: number[], fast = 12, slow = 26, signal = 9) {
   const fastEMA = calcEMA(closes, fast);
   const slowEMA = calcEMA(closes, slow);

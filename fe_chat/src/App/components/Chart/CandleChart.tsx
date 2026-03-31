@@ -9,10 +9,10 @@ import {
   LineStyle,
   createSeriesMarkers,
 } from "lightweight-charts";
-import type { Candle } from "../types";
-import type { SMCResult } from "../indicators";
-import { calcEMA, calcBB } from "../indicators";
-import { BoxPrimitive, HLinePrimitive } from "../smcDrawings";
+import type { Candle } from "../../types";
+import type { SMCResult } from "../../indicators";
+import { calcEMA, calcBB } from "../../indicators";
+import { BoxPrimitive, HLinePrimitive } from "../../smcDrawings";
 
 interface Props {
   candles: Candle[];
@@ -24,7 +24,7 @@ interface Props {
 
 export default function CandleChart({
   candles,
-  height = 360,
+  height = 480,
   smcMode = false,
   smcData,
   activeIndicators = new Set(["ema9", "ema20", "ema50", "bb"]),
@@ -84,10 +84,10 @@ export default function CandleChart({
     const closes = candles.map((c) => c.close);
     const lastTime = candles[candles.length - 1].time as any;
 
-    // ── Overlay indicators: shown independently of SMC mode ──────────────────
-    if (activeIndicators.has("ema9") || activeIndicators.has("ema20") || activeIndicators.has("ema50")) {
+    // ── Overlay indicators: hidden when SMC mode is active ───────────────────
+    if (!smcMode && (activeIndicators.has("ema9") || activeIndicators.has("ema20") || activeIndicators.has("ema50"))) {
       for (const { id, period, color } of [
-        { id: "ema9",  period: 9,  color: "#f59e0b" },
+        { id: "ema9", period: 9, color: "#f59e0b" },
         { id: "ema20", period: 20, color: "#3b82f6" },
         { id: "ema50", period: 50, color: "#a855f7" },
       ]) {
@@ -104,7 +104,7 @@ export default function CandleChart({
       }
     }
 
-    if (activeIndicators.has("bb")) {
+    if (!smcMode && activeIndicators.has("bb")) {
       const bb = calcBB(closes, 20, 2);
       const bbStyle = { color: "rgba(100,116,139,0.55)", lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false };
       const bbU = chart.addSeries(LineSeries, bbStyle);
@@ -314,11 +314,11 @@ export default function CandleChart({
 
     const fmt = (p: number) =>
       p < 0.0001 ? p.toPrecision(4)
-      : p < 0.01  ? p.toFixed(6)
-      : p < 1     ? p.toFixed(4)
-      : p < 100   ? p.toFixed(3)
-      : p < 10000 ? p.toFixed(2)
-      : p.toFixed(1);
+        : p < 0.01 ? p.toFixed(6)
+          : p < 1 ? p.toFixed(4)
+            : p < 100 ? p.toFixed(3)
+              : p < 10000 ? p.toFixed(2)
+                : p.toFixed(1);
 
     const mkLabel = (isHigh: boolean) => {
       const el = document.createElement("div");
@@ -343,7 +343,7 @@ export default function CandleChart({
     };
 
     const highLabel = mkLabel(true);
-    const lowLabel  = mkLabel(false);
+    const lowLabel = mkLabel(false);
 
     // Clamp label so it doesn't overflow left/right edges of the chart area
     const clampX = (x: number, labelW: number, chartW: number) =>
@@ -353,28 +353,28 @@ export default function CandleChart({
       const range = chart.timeScale().getVisibleLogicalRange();
       if (!range) return;
       const from = Math.max(0, Math.floor(range.from));
-      const to   = Math.min(candles.length - 1, Math.ceil(range.to));
+      const to = Math.min(candles.length - 1, Math.ceil(range.to));
       if (from > to) return;
 
       let maxH = -Infinity, minL = Infinity;
       let maxIdx = from, minIdx = from;
       for (let i = from; i <= to; i++) {
         if (candles[i].high > maxH) { maxH = candles[i].high; maxIdx = i; }
-        if (candles[i].low  < minL) { minL = candles[i].low;  minIdx = i; }
+        if (candles[i].low < minL) { minL = candles[i].low; minIdx = i; }
       }
 
       const highY = candleSeries.priceToCoordinate(maxH);
-      const lowY  = candleSeries.priceToCoordinate(minL);
+      const lowY = candleSeries.priceToCoordinate(minL);
       const highX = chart.timeScale().timeToCoordinate(candles[maxIdx].time as any);
-      const lowX  = chart.timeScale().timeToCoordinate(candles[minIdx].time as any);
+      const lowX = chart.timeScale().timeToCoordinate(candles[minIdx].time as any);
       const chartW = container.clientWidth;
       const LABEL_H = 18;
 
       if (highY != null && highX != null) {
         const top = Math.max(0, highY - LABEL_H - 4);
         highLabel.textContent = `▲ ${fmt(maxH)}`;
-        highLabel.style.top     = `${top}px`;
-        highLabel.style.left    = `${clampX(highX, highLabel.offsetWidth || 80, chartW)}px`;
+        highLabel.style.top = `${top}px`;
+        highLabel.style.left = `${clampX(highX, highLabel.offsetWidth || 80, chartW)}px`;
         highLabel.style.display = "block";
       } else {
         highLabel.style.display = "none";
@@ -383,8 +383,8 @@ export default function CandleChart({
       if (lowY != null && lowX != null) {
         const top = lowY + 4;
         lowLabel.textContent = `▼ ${fmt(minL)}`;
-        lowLabel.style.top     = `${top}px`;
-        lowLabel.style.left    = `${clampX(lowX, lowLabel.offsetWidth || 80, chartW)}px`;
+        lowLabel.style.top = `${top}px`;
+        lowLabel.style.left = `${clampX(lowX, lowLabel.offsetWidth || 80, chartW)}px`;
         lowLabel.style.display = "block";
       } else {
         lowLabel.style.display = "none";

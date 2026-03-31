@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { createChart, ColorType, LineSeries } from "lightweight-charts";
-import type { Candle } from "../types";
+import type { Candle } from "../../types";
 import type { IndicatorId } from "./IndicatorPicker";
-import { calcRSI } from "../indicators";
+import { calcRSI } from "../../indicators";
 
 interface Props {
   candles: Candle[];

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { coins } from "../../coins";
+import { coins } from "../../../coins";
 
 interface Props {
   onCoinClick: (coin: string) => void;
@@ -32,11 +32,13 @@ export default function CoinList({ onCoinClick, selectedCoin }: Props) {
     setSearch("");
   };
 
+  const base = selectedCoin?.replace("USDT", "") ?? "BTC";
+
   return (
     <div className="coin-dropdown" ref={ref}>
-      <button className="coin-dropdown-trigger" onClick={() => setOpen((o) => !o)}>
-        <span className="coin-dd-symbol">{selectedCoin?.replace("USDT", "") ?? "BTC"}</span>
-        <span className="coin-dd-pair">/ USDT</span>
+      <button className="coin-trigger" onClick={() => setOpen((o) => !o)}>
+        <span className="coin-trigger-base">{base}</span>
+        <span className="coin-trigger-quote">/ USDT</span>
         <svg
           width="11"
           height="11"
@@ -44,7 +46,7 @@ export default function CoinList({ onCoinClick, selectedCoin }: Props) {
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
-          className={`coin-dd-caret${open ? " open" : ""}`}
+          className={`coin-trigger-chevron${open ? " open" : ""}`}
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
@@ -52,33 +54,28 @@ export default function CoinList({ onCoinClick, selectedCoin }: Props) {
 
       {open && (
         <div className="coin-dropdown-menu">
-          <div className="coin-dropdown-search">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+          <div className="coin-search-wrap">
             <input
               autoFocus
               type="text"
-              className="coin-search-input"
+              className="coin-search"
               placeholder="Search coin..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="coin-dropdown-list">
+          <div className="coin-list-scroll">
             {filtered.length === 0 ? (
-              <div className="coin-dropdown-empty">No results</div>
+              <div className="coin-item" style={{ color: "var(--text-muted)", cursor: "default" }}>No results</div>
             ) : (
               filtered.map((coin) => (
-                <button
+                <div
                   key={coin}
-                  className={`coin-dropdown-item${selectedCoin === coin ? " active" : ""}`}
+                  className={`coin-item${selectedCoin === coin ? " selected" : ""}`}
                   onClick={() => handleSelect(coin)}
                 >
-                  <span className="coin-dd-symbol">{coin.replace("USDT", "")}</span>
-                  <span className="coin-dd-pair">USDT</span>
-                </button>
+                  {coin.replace("USDT", "")} <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>USDT</span>
+                </div>
               ))
             )}
           </div>

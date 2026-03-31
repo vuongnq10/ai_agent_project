@@ -1,12 +1,11 @@
 import { useState, useMemo } from "react";
-import { calcSMC } from "../indicators";
-import MarketBar from "./MarketBar";
+import { calcSMC } from "../../indicators";
 import CandleChart from "./CandleChart";
 import IndicatorChart from "./IndicatorChart";
 import SMCPanel from "./SMCPanel";
 import TimeframeSelector, { type Timeframe } from "./TimeframeSelector";
 import IndicatorPicker, { type IndicatorId, INDICATORS } from "./IndicatorPicker";
-import { useCandles } from "../../hooks/useCandles";
+import { useCandles } from "../../../hooks/useCandles";
 
 interface Props {
   symbol: string;
@@ -38,11 +37,12 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAna
 
   return (
     <div className="chart-panel">
-      <div className="chart-toolbar">
-        <MarketBar symbol={symbol} />
-        <div className="chart-toolbar-right">
+      <div className="chart-controls">
+        <div className="controls-left">
           <TimeframeSelector value={timeframe} onChange={onTimeframeChange} />
+          <div className="ctrl-sep" />
           <IndicatorPicker active={activeIndicators} onChange={toggleIndicator} />
+          <div className="ctrl-sep" />
           <label className="smc-toggle" title={smcMode ? "Switch to Classic" : "Switch to SMC"}>
             <input
               type="checkbox"
@@ -54,7 +54,12 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAna
             </span>
             <span className="smc-toggle-label">SMC</span>
           </label>
+        </div>
+        <div className="controls-right">
           <button className="analyze-btn" onClick={() => onAnalyze(symbol, timeframe)}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
             AI Analyze
           </button>
         </div>
@@ -69,7 +74,7 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAna
             smcData={smcData}
             activeIndicators={activeIndicators}
           />
-          {activeLegend.length > 0 && (
+          {!smcMode && activeLegend.length > 0 && (
             <div className="chart-legend">
               {activeLegend.map((ind) => (
                 <span key={ind.id} className="legend-item" style={{ color: ind.color }}>

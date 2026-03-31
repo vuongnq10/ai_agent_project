@@ -1,4 +1,4 @@
-import { TIMEFRAMES, type Timeframe } from "../../constants";
+import { TIMEFRAMES, type Timeframe } from "../../../constants";
 export type { Timeframe };
 
 interface Props {

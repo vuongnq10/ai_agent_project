@@ -40,7 +40,7 @@ export default function IndicatorPicker({ active, onChange }: Props) {
 
   return (
     <div className="ind-picker" ref={ref}>
-      <button className="ind-picker-btn" onClick={() => setOpen((o) => !o)}>
+      <button className="btn btn-ghost btn-icon" onClick={() => setOpen((o) => !o)}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
         </svg>
@@ -52,29 +52,29 @@ export default function IndicatorPicker({ active, onChange }: Props) {
 
       {open && (
         <div className="ind-picker-dropdown">
-          <div className="ind-picker-group-label">Overlay</div>
+          <div className="ind-group-label">Overlay</div>
           {overlays.map((ind) => (
-            <label key={ind.id} className="ind-picker-row">
+            <label key={ind.id} className="ind-row">
               <input
                 type="checkbox"
                 checked={active.has(ind.id)}
                 onChange={(e) => onChange(ind.id, e.target.checked)}
               />
-              <span className="ind-picker-dot" style={{ background: ind.color }} />
-              <span className="ind-picker-name">{ind.label}</span>
+              <span className="ind-dot" style={{ background: ind.color }} />
+              <span className="ind-name">{ind.label}</span>
             </label>
           ))}
-          <div className="ind-picker-divider" />
-          <div className="ind-picker-group-label">Panel</div>
+          <div style={{ height: 1, background: "var(--border-subtle)", margin: "6px 0" }} />
+          <div className="ind-group-label">Panel</div>
           {panels.map((ind) => (
-            <label key={ind.id} className="ind-picker-row">
+            <label key={ind.id} className="ind-row">
               <input
                 type="checkbox"
                 checked={active.has(ind.id)}
                 onChange={(e) => onChange(ind.id, e.target.checked)}
               />
-              <span className="ind-picker-dot" style={{ background: ind.color }} />
-              <span className="ind-picker-name">{ind.label}</span>
+              <span className="ind-dot" style={{ background: ind.color }} />
+              <span className="ind-name">{ind.label}</span>
             </label>
           ))}
         </div>

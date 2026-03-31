@@ -2,12 +2,12 @@ import { useState } from "react";
 import "../App.css";
 import { TIMEFRAMES, type Timeframe } from "../constants";
 import { coins } from "../coins";
-import Header from "./Header";
-import CoinList from "./Sidebar/CoinList";
-import LeveragePanel from "./Sidebar/LeveragePanel";
-import ChatMessages from "./ChatMessages";
-import ChatInput from "./ChatInput";
-import ChartPanel from "./ChartPanel";
+import Header from "./components/Header";
+import CoinList from "./components/CoinList";
+import LeveragePanel from "./components/LeveragePanel";
+import Messages from "./components/Chat/Messages";
+import Input from "./components/Chat/Input";
+import ChartPanel from "./components/Chart";
 import { useChat } from "../hooks/useChat";
 
 function getUrlParams(): { coin: string; tf: Timeframe } {
@@ -54,9 +54,9 @@ export default function App() {
   return (
     <div className="app-container">
       <Header
-        onToggleSidebar={() => {}}
         onClearChat={clearHistory}
-        center={<CoinList onCoinClick={handleCoinChange} selectedCoin={selectedCoin} />}
+        coinList={<CoinList onCoinClick={handleCoinChange} selectedCoin={selectedCoin} />}
+        symbol={selectedCoin}
         showLeverage={showLeverage}
         onToggleLeverage={() => setShowLeverage((v) => !v)}
       />
@@ -65,26 +65,31 @@ export default function App() {
           <LeveragePanel />
         </div>
       )}
-      <main className="main-content">
-        <section className="dashboard-center">
+      <div className="workspace">
+        <div className="chart-workspace">
           <ChartPanel
             symbol={selectedCoin}
             timeframe={timeframe}
             onTimeframeChange={handleTimeframeChange}
             onAnalyze={handleAnalyze}
           />
-        </section>
-        <aside className="chat-panel">
-          <div className="chat-panel-header">AI Trading Assistant</div>
-          <ChatMessages chatHistory={chatHistory} loading={loading} />
-          <ChatInput
+        </div>
+        <aside className="chat-sidebar">
+          <div className="chat-header">
+            <div className="chat-header-title">
+              <div className="chat-online-dot" />
+              AI Trading Assistant
+            </div>
+          </div>
+          <Messages chatHistory={chatHistory} loading={loading} />
+          <Input
             message={message}
             loading={loading}
             onChange={setMessage}
             onSubmit={handleSubmit}
           />
         </aside>
-      </main>
+      </div>
     </div>
   );
 }
