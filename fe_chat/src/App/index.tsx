@@ -9,6 +9,12 @@ import Messages from "./components/Chat/Messages";
 import Input from "./components/Chat/Input";
 import ChartPanel from "./components/Chart";
 import { useChat } from "../hooks/useChat";
+import type { AgentId } from "../services/chatService";
+
+const AGENTS: { id: AgentId; label: string; model: string }[] = [
+  { id: "gemini", label: "Gemini", model: "2.5 Flash" },
+  { id: "claude", label: "Claude", model: "Opus 4.6" },
+];
 
 function getUrlParams(): { coin: string; tf: Timeframe } {
   const sp = new URLSearchParams(window.location.search);
@@ -26,10 +32,14 @@ function updateUrlParam(key: string, value: string) {
 }
 
 export default function App() {
-  const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat();
+  const [selectedAgent, setSelectedAgent] = useState<AgentId>("gemini");
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(selectedAgent);
   const [selectedCoin, setSelectedCoin] = useState(() => getUrlParams().coin);
   const [timeframe, setTimeframe] = useState<Timeframe>(() => getUrlParams().tf);
   const [showLeverage, setShowLeverage] = useState(false);
+
+  const activeAgent = AGENTS.find((a) => a.id === selectedAgent)!;
 
   const handleCoinChange = (coin: string) => {
     setSelectedCoin(coin);
@@ -79,6 +89,36 @@ export default function App() {
             <div className="chat-header-title">
               <div className="chat-online-dot" />
               AI Trading Assistant
+            </div>
+            <div className="agent-switcher">
+              <button
+                className="agent-trigger"
+                onClick={() => setAgentMenuOpen((v) => !v)}
+              >
+                <span className="agent-trigger-label">{activeAgent.label}</span>
+                <span className="agent-trigger-model">{activeAgent.model}</span>
+                <svg
+                  className={`agent-trigger-chevron${agentMenuOpen ? " open" : ""}`}
+                  width="10" height="10" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {agentMenuOpen && (
+                <div className="agent-menu">
+                  {AGENTS.map((a) => (
+                    <button
+                      key={a.id}
+                      className={`agent-menu-item${a.id === selectedAgent ? " active" : ""}`}
+                      onClick={() => { setSelectedAgent(a.id); setAgentMenuOpen(false); }}
+                    >
+                      <span className="agent-menu-label">{a.label}</span>
+                      <span className="agent-menu-model">{a.model}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <Messages chatHistory={chatHistory} loading={loading} />

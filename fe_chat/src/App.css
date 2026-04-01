@@ -826,6 +826,7 @@ html, body, #root {
 .chat-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 16px;
   height: 38px;
   min-height: 38px;
@@ -857,6 +858,80 @@ html, body, #root {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+/* ── Agent Switcher ───────────────────────────────── */
+.agent-switcher {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.agent-trigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.agent-trigger:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+
+.agent-trigger-label {
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.2px;
+}
+.agent-trigger-model {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.agent-trigger-chevron {
+  color: var(--text-muted);
+  transition: transform var(--transition);
+  margin-left: 1px;
+}
+.agent-trigger-chevron.open { transform: rotate(180deg); }
+
+.agent-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 300;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.agent-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+  text-align: left;
+}
+.agent-menu-item:hover { background: var(--bg-hover); }
+.agent-menu-item.active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.agent-menu-label { font-weight: 600; }
+.agent-menu-model { color: var(--text-muted); font-size: 11px; }
 
 /* ── Chat Messages ────────────────────────────────── */
 .chat-messages {

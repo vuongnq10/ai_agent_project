@@ -49,6 +49,15 @@ export default function CandleChart({
     });
 
     // ── Candlestick ──────────────────────────────────────────────────────────
+    const minPrice = Math.min(...candles.map((c) => c.low));
+    const pricePrecision =
+      minPrice < 0.0001 ? 8
+      : minPrice < 0.01 ? 6
+      : minPrice < 1 ? 4
+      : minPrice < 100 ? 3
+      : minPrice < 10000 ? 2
+      : 1;
+
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#089981",
       downColor: "#f23645",
@@ -56,6 +65,11 @@ export default function CandleChart({
       borderDownColor: "#f23645",
       wickUpColor: "#089981",
       wickDownColor: "#f23645",
+      priceFormat: {
+        type: "price",
+        precision: pricePrecision,
+        minMove: Math.pow(10, -pricePrecision),
+      },
     });
     candleSeries.setData(
       candles.map((c) => ({
