@@ -5,6 +5,16 @@ from src.binance_connector.binance import BinanceConnector
 
 trading = APIRouter()
 
+AI_MODELS = [
+    {"id": "gemini", "label": "Gemini", "model": "2.5 Flash"},
+    {"id": "claude", "label": "Claude", "model": "Opus 4.6"},
+]
+
+
+@trading.get("/models")
+async def get_models():
+    return AI_MODELS
+
 
 class LeverageRequest(BaseModel):
     symbol: str

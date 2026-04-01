@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../App.css";
 import { TIMEFRAMES, type Timeframe } from "../constants";
 import { coins } from "../coins";
@@ -10,9 +10,9 @@ import Input from "./components/Chat/Input";
 import ChartPanel from "./components/Chart";
 import { useChat } from "../hooks/useChat";
 import { useTheme } from "../hooks/useTheme";
-import type { AgentId } from "../services/chatService";
+import { fetchModels, type AgentId, type AIModel } from "../services/chatService";
 
-const AGENTS: { id: AgentId; label: string; model: string }[] = [
+const FALLBACK_AGENTS: AIModel[] = [
   { id: "gemini", label: "Gemini", model: "2.5 Flash" },
   { id: "claude", label: "Claude", model: "Opus 4.6" },
 ];
@@ -34,6 +34,7 @@ function updateUrlParam(key: string, value: string) {
 
 export default function App() {
   const [theme, toggleTheme] = useTheme();
+  const [agents, setAgents] = useState<AIModel[]>(FALLBACK_AGENTS);
   const [selectedAgent, setSelectedAgent] = useState<AgentId>("gemini");
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(selectedAgent);
@@ -41,7 +42,16 @@ export default function App() {
   const [timeframe, setTimeframe] = useState<Timeframe>(() => getUrlParams().tf);
   const [showLeverage, setShowLeverage] = useState(false);
 
-  const activeAgent = AGENTS.find((a) => a.id === selectedAgent)!;
+  useEffect(() => {
+    fetchModels()
+      .then((data) => {
+        setAgents(data);
+        setSelectedAgent(data[0]?.id ?? "gemini");
+      })
+      .catch(() => {/* keep fallback */});
+  }, []);
+
+  const activeAgent = agents.find((a) => a.id === selectedAgent) ?? agents[0];
 
   const handleCoinChange = (coin: string) => {
     setSelectedCoin(coin);
@@ -112,7 +122,7 @@ export default function App() {
               </button>
               {agentMenuOpen && (
                 <div className="agent-menu">
-                  {AGENTS.map((a) => (
+                  {agents.map((a) => (
                     <button
                       key={a.id}
                       className={`agent-menu-item${a.id === selectedAgent ? " active" : ""}`}

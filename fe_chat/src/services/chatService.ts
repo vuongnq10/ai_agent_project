@@ -1,6 +1,17 @@
 import { BOT_BASE_URL } from "./config";
 
-export type AgentId = "gemini" | "claude";
+export type AgentId = string;
+
+export interface AIModel {
+  id: AgentId;
+  label: string;
+  model: string;
+}
+
+export async function fetchModels(): Promise<AIModel[]> {
+  const res = await fetch(`${BOT_BASE_URL}/trading/models`);
+  return res.json();
+}
 
 export function streamChat(
   query: string,
