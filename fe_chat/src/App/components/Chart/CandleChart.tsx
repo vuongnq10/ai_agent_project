@@ -20,6 +20,7 @@ interface Props {
   smcMode?: boolean;
   smcData?: SMCResult | null;
   activeIndicators?: Set<string>;
+  theme?: "light" | "dark";
 }
 
 export default function CandleChart({
@@ -28,6 +29,7 @@ export default function CandleChart({
   smcMode = false,
   smcData,
   activeIndicators = new Set(["ema9", "ema20", "ema50", "bb"]),
+  theme = "dark",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -35,15 +37,23 @@ export default function CandleChart({
     if (!containerRef.current || candles.length === 0) return;
     const container = containerRef.current;
 
+    const isLight = theme === "light";
+    const chartColors = {
+      bg:      isLight ? "#ffffff" : "#0d1117",
+      text:    isLight ? "#374151" : "#9ca3af",
+      grid:    isLight ? "#e5e7eb" : "#1f2937",
+      border:  isLight ? "#d1d5db" : "#374151",
+    };
+
     const chart = createChart(container, {
       layout: {
-        background: { type: ColorType.Solid, color: "#0d1117" },
-        textColor: "#9ca3af",
+        background: { type: ColorType.Solid, color: chartColors.bg },
+        textColor: chartColors.text,
       },
-      grid: { vertLines: { color: "#1f2937" }, horzLines: { color: "#1f2937" } },
+      grid: { vertLines: { color: chartColors.grid }, horzLines: { color: chartColors.grid } },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "#374151" },
-      timeScale: { borderColor: "#374151", timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: chartColors.border },
+      timeScale: { borderColor: chartColors.border, timeVisible: true, secondsVisible: false },
       width: container.clientWidth,
       height,
     });
@@ -420,7 +430,7 @@ export default function CandleChart({
       highLabel.remove();
       lowLabel.remove();
     };
-  }, [candles, height, smcMode, smcData, activeIndicators]);
+  }, [candles, height, smcMode, smcData, activeIndicators, theme]);
 
   return <div ref={containerRef} className="candle-chart-container" />;
 }

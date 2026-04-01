@@ -6,14 +6,16 @@ interface Props {
   symbol: string;
   showLeverage: boolean;
   onToggleLeverage: () => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
 }
 
-export default function Header({ onClearChat, coinList, symbol, showLeverage, onToggleLeverage }: Props) {
+export default function Header({ onClearChat, coinList, symbol, showLeverage, onToggleLeverage, theme, onToggleTheme }: Props) {
   return (
     <header className="app-header">
       <div className="header-brand">
-        <div className="header-logo">CA</div>
-        <span className="header-title">CryptoAI</span>
+        <div className="header-logo">🥔</div>
+        <span className="header-title">Great Potato</span>
       </div>
 
       <div className="header-vsep" />
@@ -41,6 +43,13 @@ export default function Header({ onClearChat, coinList, symbol, showLeverage, on
             <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
           </svg>
           <span>Clear</span>
+        </button>
+        <button
+          className="theme-toggle"
+          onClick={onToggleTheme}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? "☀" : "☾"}
         </button>
       </div>
     </header>

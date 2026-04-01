@@ -7,9 +7,10 @@ import { calcRSI } from "../../indicators";
 interface Props {
   candles: Candle[];
   activeIndicators: Set<IndicatorId>;
+  theme?: "light" | "dark";
 }
 
-export default function IndicatorChart({ candles, activeIndicators }: Props) {
+export default function IndicatorChart({ candles, activeIndicators, theme = "dark" }: Props) {
   const rsiRef = useRef<HTMLDivElement>(null);
 
   const showRSI = activeIndicators.has("rsi");
@@ -19,11 +20,19 @@ export default function IndicatorChart({ candles, activeIndicators }: Props) {
 
     const closes = candles.map((c) => c.close);
 
+    const isLight = theme === "light";
+    const chartColors = {
+      bg:     isLight ? "#ffffff" : "#0d1117",
+      text:   isLight ? "#374151" : "#9ca3af",
+      grid:   isLight ? "#e5e7eb" : "#1f2937",
+      border: isLight ? "#d1d5db" : "#374151",
+    };
+
     const chart = createChart(rsiRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "#0d1117" }, textColor: "#9ca3af" },
-      grid: { vertLines: { color: "#1f2937" }, horzLines: { color: "#1f2937" } },
-      rightPriceScale: { borderColor: "#374151", scaleMargins: { top: 0.1, bottom: 0.1 } },
-      timeScale: { borderColor: "#374151", timeVisible: true, secondsVisible: false },
+      layout: { background: { type: ColorType.Solid, color: chartColors.bg }, textColor: chartColors.text },
+      grid: { vertLines: { color: chartColors.grid }, horzLines: { color: chartColors.grid } },
+      rightPriceScale: { borderColor: chartColors.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
+      timeScale: { borderColor: chartColors.border, timeVisible: true, secondsVisible: false },
       width: rsiRef.current.clientWidth,
       height: 120,
     });
@@ -53,7 +62,7 @@ export default function IndicatorChart({ candles, activeIndicators }: Props) {
       ro.disconnect();
       chart.remove();
     };
-  }, [candles, showRSI]);
+  }, [candles, showRSI, theme]);
 
   if (!showRSI) return null;
 

@@ -9,6 +9,7 @@ import Messages from "./components/Chat/Messages";
 import Input from "./components/Chat/Input";
 import ChartPanel from "./components/Chart";
 import { useChat } from "../hooks/useChat";
+import { useTheme } from "../hooks/useTheme";
 import type { AgentId } from "../services/chatService";
 
 const AGENTS: { id: AgentId; label: string; model: string }[] = [
@@ -32,6 +33,7 @@ function updateUrlParam(key: string, value: string) {
 }
 
 export default function App() {
+  const [theme, toggleTheme] = useTheme();
   const [selectedAgent, setSelectedAgent] = useState<AgentId>("gemini");
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(selectedAgent);
@@ -69,6 +71,8 @@ export default function App() {
         symbol={selectedCoin}
         showLeverage={showLeverage}
         onToggleLeverage={() => setShowLeverage((v) => !v)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       {showLeverage && (
         <div className="leverage-popover">
@@ -82,6 +86,7 @@ export default function App() {
             timeframe={timeframe}
             onTimeframeChange={handleTimeframeChange}
             onAnalyze={handleAnalyze}
+            theme={theme}
           />
         </div>
         <aside className="chat-sidebar">

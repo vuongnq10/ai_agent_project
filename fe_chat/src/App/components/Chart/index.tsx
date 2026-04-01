@@ -12,11 +12,12 @@ interface Props {
   timeframe: Timeframe;
   onTimeframeChange: (tf: Timeframe) => void;
   onAnalyze: (symbol: string, timeframe: Timeframe) => void;
+  theme?: "light" | "dark";
 }
 
 const DEFAULT_ACTIVE = new Set<IndicatorId>(["ema9", "ema20", "ema50", "bb", "rsi"]);
 
-export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAnalyze }: Props) {
+export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAnalyze, theme = "dark" }: Props) {
   const [smcMode, setSmcMode] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(DEFAULT_ACTIVE);
   const { candles, loading } = useCandles(symbol, timeframe);
@@ -73,6 +74,7 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAna
             smcMode={smcMode}
             smcData={smcData}
             activeIndicators={activeIndicators}
+            theme={theme}
           />
           {!smcMode && activeLegend.length > 0 && (
             <div className="chart-legend">
@@ -83,7 +85,7 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAna
               ))}
             </div>
           )}
-          <IndicatorChart candles={candles} activeIndicators={activeIndicators} />
+          <IndicatorChart candles={candles} activeIndicators={activeIndicators} theme={theme} />
           <SMCPanel candles={candles} />
         </>
       )}
