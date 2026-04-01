@@ -74,6 +74,8 @@ export default function SMCPanel({ candles }: Props) {
   const activeBullOBs = smc.orderBlocks.filter((o) => o.type === "bullish" && !o.mitigated).slice(-2);
   const activeBearOBs = smc.orderBlocks.filter((o) => o.type === "bearish" && !o.mitigated).slice(-2);
 
+  const topEntries = smc.potentialEntries.slice(0, 3);
+
   const bullFVGs = smc.fairValueGaps.filter((f) => f.type === "bullish").slice(-2);
   const bearFVGs = smc.fairValueGaps.filter((f) => f.type === "bearish").slice(-2);
 
@@ -146,6 +148,7 @@ export default function SMCPanel({ candles }: Props) {
             <span className="smc-ob-tag bull">Bull</span>
             <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(ob.low)} – {fmt(ob.high)}</span>
             <span className="smc-dist">+{distPct(ob.high, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${ob.strength}, 70%, 35%)` }}>{ob.strength}%</span>
           </div>
         ))}
         {activeBearOBs.map((ob, i) => (
@@ -153,6 +156,7 @@ export default function SMCPanel({ candles }: Props) {
             <span className="smc-ob-tag bear">Bear</span>
             <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(ob.low)} – {fmt(ob.high)}</span>
             <span className="smc-dist">-{distPct(ob.low, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${ob.strength}, 70%, 35%)` }}>{ob.strength}%</span>
           </div>
         ))}
       </div>
@@ -177,6 +181,7 @@ export default function SMCPanel({ candles }: Props) {
             <span className="smc-fvg-tag bull">↑ FVG</span>
             <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(fvg.low)} – {fmt(fvg.high)}</span>
             <span className="smc-dist">{gapSizePct(fvg.high, fvg.low, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${fvg.strength}, 70%, 35%)` }}>{fvg.strength}%</span>
           </div>
         ))}
         {bearFVGs.map((fvg, i) => (
@@ -184,6 +189,50 @@ export default function SMCPanel({ candles }: Props) {
             <span className="smc-fvg-tag bear">↓ FVG</span>
             <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(fvg.low)} – {fmt(fvg.high)}</span>
             <span className="smc-dist">{gapSizePct(fvg.high, fvg.low, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${fvg.strength}, 70%, 35%)` }}>{fvg.strength}%</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="smc-vsep" />
+
+      {/* ── Potential Entries ──────────────── */}
+      <div className="smc-section" style={{ minWidth: 220 }}>
+        <div className="smc-sec-title">
+          Potential Entries
+          {topEntries.length > 0 && (
+            <span style={{ color: "#f59e0b", marginLeft: 5 }}>{topEntries.length} signal{topEntries.length > 1 ? "s" : ""}</span>
+          )}
+        </div>
+        {topEntries.length === 0 && (
+          <span className="smc-stat-val smc-none">No confluence found</span>
+        )}
+        {topEntries.map((e, i) => (
+          <div key={i} className="smc-entry-row">
+            <span
+              className="smc-ob-tag"
+              style={{
+                color: e.type === "bullish" ? "#089981" : "#f23645",
+                background: e.type === "bullish" ? "#08998118" : "#f2364518",
+                border: `1px solid ${e.type === "bullish" ? "#089981" : "#f23645"}`,
+              }}
+            >
+              {e.type === "bullish" ? "↑ LONG" : "↓ SHORT"}
+            </span>
+            <span className="smc-stat-val" style={{ color: e.type === "bullish" ? "#089981" : "#f23645" }}>
+              {fmt(e.zoneLow)} – {fmt(e.zoneHigh)}
+            </span>
+            <span className="smc-dist">{e.distancePct.toFixed(2)}%</span>
+            <span
+              className="smc-confluence-badge"
+              style={{
+                background: e.confluenceScore >= 70 ? "#f59e0b22" : "#ffffff10",
+                border: `1px solid ${e.confluenceScore >= 70 ? "#f59e0b" : "#4b5563"}`,
+                color: e.confluenceScore >= 70 ? "#f59e0b" : "#9ca3af",
+              }}
+            >
+              {e.confluenceScore}%
+            </span>
           </div>
         ))}
       </div>

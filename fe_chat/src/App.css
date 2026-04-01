@@ -758,6 +758,33 @@ html, body, #root {
 .smc-ob-tag.bull, .smc-fvg-tag.bull { color: var(--green); background: var(--green-bg); }
 .smc-ob-tag.bear, .smc-fvg-tag.bear { color: var(--red); background: var(--red-bg); }
 
+.smc-strength-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #fff;
+  margin-left: 2px;
+  min-width: 22px;
+  text-align: center;
+}
+
+.smc-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0;
+  flex-wrap: wrap;
+}
+
+.smc-confluence-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
 /* Mini gauge */
 .smc-mini-gauge {
   height: 4px;

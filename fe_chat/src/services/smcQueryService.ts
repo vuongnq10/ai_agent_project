@@ -4,12 +4,12 @@ import type { SMCResult } from '../App/indicators';
 import type { Candle } from '../App/types';
 
 const TIMEFRAMES = [
-  { label: '30m', interval: '30m' },
+  { label: '1h', interval: '1h' },
   { label: '2h', interval: '2h' },
   { label: '4h', interval: '4h' },
 ] as const;
 
-function p(n: number, digits = 4): string {
+function fixNumber(n: number, digits = 4): string {
   return n.toFixed(digits);
 }
 
@@ -32,52 +32,69 @@ function formatSMC(
 
   const lines: string[] = [
     `### ${symbol} — ${tf} Timeframe`,
-    `Current Price: ${p(lastClose)}`,
+    `Current Price: ${fixNumber(lastClose)}`,
     `Trend: ${smc.trend.toUpperCase()}`,
-    `ATR(14): ${p(atr)}`,
+    `ATR(14): ${fixNumber(atr)}`,
     ``,
     `**Structure**`,
-    `BOS: ${smc.lastBOS ? `${smc.lastBOS.direction} at ${p(smc.lastBOS.price)}` : 'none'}`,
-    `CHoCH: ${smc.lastCHoCH ? `${smc.lastCHoCH.direction} at ${p(smc.lastCHoCH.price)}` : 'none'}`,
+    `BOS: ${smc.lastBOS ? `${smc.lastBOS.direction} at ${fixNumber(smc.lastBOS.price)}` : 'none'}`,
+    `CHoCH: ${smc.lastCHoCH ? `${smc.lastCHoCH.direction} at ${fixNumber(smc.lastCHoCH.price)}` : 'none'}`,
     ``,
     `**Premium / Discount**`,
-    `Range: ${p(smc.rangeLow)} – ${p(smc.rangeHigh)}`,
-    `Equilibrium: ${p(smc.equilibrium)}`,
-    `Zone: ${smc.premiumDiscountZone} (${p(smc.premiumDiscountPct, 1)}%)`,
+    `Range: ${fixNumber(smc.rangeLow)} – ${fixNumber(smc.rangeHigh)}`,
+    `Equilibrium: ${fixNumber(smc.equilibrium)}`,
+    `Zone: ${smc.premiumDiscountZone} (${fixNumber(smc.premiumDiscountPct, 1)}%)`,
     ``,
-    `**Order Blocks (unmitigated)**`,
+    `**Order Blocks (unmitigated, strength 0–100%)**`,
     activeOBs.length === 0
       ? 'none'
       : activeOBs
           .slice(-4)
-          .map((ob) => `  ${ob.type} OB: ${p(ob.low)} – ${p(ob.high)}`)
+          .map(
+            (ob) =>
+              `  ${ob.type} OB: ${fixNumber(ob.low)} – ${fixNumber(ob.high)}  strength=${ob.strength}%`,
+          )
           .join('\n'),
     ``,
-    `**Fair Value Gaps (unfilled)**`,
+    `**Fair Value Gaps (unfilled, strength 0–100%)**`,
     activeFVGs.length === 0
       ? 'none'
       : activeFVGs
           .slice(-4)
-          .map((f) => `  ${f.type} FVG: ${p(f.low)} – ${p(f.high)}`)
+          .map(
+            (f) =>
+              `  ${f.type} FVG: ${fixNumber(f.low)} – ${fixNumber(f.high)}  strength=${f.strength}%`,
+          )
+          .join('\n'),
+    ``,
+    `**Potential Entry Zones (OB + FVG confluence)**`,
+    smc.potentialEntries.length === 0
+      ? 'none'
+      : smc.potentialEntries
+          .slice(0, 3)
+          .map(
+            (e) =>
+              `  ${e.type.toUpperCase()} zone: ${fixNumber(e.zoneLow)} – ${fixNumber(e.zoneHigh)}  confluence=${e.confluenceScore}%  OB=${e.obStrength}%  FVG=${e.fvgStrength}%  dist=${fixNumber(e.distancePct, 2)}%`,
+          )
           .join('\n'),
     ``,
     `**Liquidity**`,
     `Buy-side (above): ${
       smc.buySideLiquidity
         .slice(0, 3)
-        .map((v) => p(v))
+        .map((v) => fixNumber(v))
         .join(', ') || 'none'
     }`,
     `Sell-side (below): ${
       smc.sellSideLiquidity
         .slice(0, 3)
-        .map((v) => p(v))
+        .map((v) => fixNumber(v))
         .join(', ') || 'none'
     }`,
     ``,
     `**Indicators**`,
-    `EMA9: ${ema9 != null ? p(ema9) : 'n/a'}  EMA20: ${ema20 != null ? p(ema20) : 'n/a'}  EMA50: ${ema50 != null ? p(ema50) : 'n/a'}`,
-    `RSI(14): ${rsi14 != null ? p(rsi14, 1) : 'n/a'}`,
+    `EMA9: ${ema9 != null ? fixNumber(ema9) : 'n/a'}  EMA20: ${ema20 != null ? fixNumber(ema20) : 'n/a'}  EMA50: ${ema50 != null ? fixNumber(ema50) : 'n/a'}`,
+    `RSI(14): ${rsi14 != null ? fixNumber(rsi14, 1) : 'n/a'}`,
   ];
 
   return lines.join('\n');

@@ -14,6 +14,7 @@ export interface OrderBlock {
   low: number;
   index: number;
   mitigated: boolean;
+  strength: number; // 0–100
 }
 
 export interface FVG {
@@ -22,6 +23,17 @@ export interface FVG {
   low: number;
   index: number;
   filled: boolean;
+  strength: number; // 0–100
+}
+
+export interface PotentialEntry {
+  type: "bullish" | "bearish";
+  zoneHigh: number;
+  zoneLow: number;
+  confluenceScore: number; // 0–100
+  obStrength: number;
+  fvgStrength: number;
+  distancePct: number; // % distance from current price to zone midpoint
 }
 
 export interface SMCResult {
@@ -39,6 +51,7 @@ export interface SMCResult {
   rangeLow: number;
   buySideLiquidity: number[];  // swing high prices (sell stops above)
   sellSideLiquidity: number[]; // swing low prices (buy stops below)
+  potentialEntries: PotentialEntry[];
 }
 
 // ─── SMC Calculations ─────────────────────────────────────────────────────────
@@ -60,6 +73,19 @@ function findSwings(candles: Candle[], lookback = 5): { highs: SwingPoint[]; low
   return { highs, lows };
 }
 
+function scoreOB(candle: Candle, atr: number): number {
+  const range = candle.high - candle.low;
+  if (range === 0 || atr === 0) return 0;
+  const bodyRatio = Math.abs(candle.close - candle.open) / range;
+  const sizeVsAtr = Math.min(range / atr, 2) / 2; // 0=tight 1=wide
+  return Math.min(100, Math.round(bodyRatio * 65 + (1 - sizeVsAtr) * 35));
+}
+
+function scoreFVG(high: number, low: number, atr: number): number {
+  if (atr === 0) return 0;
+  return Math.min(100, Math.round(((high - low) / atr) * 80));
+}
+
 export function calcSMC(candles: Candle[]): SMCResult {
   if (candles.length < 30) {
     const last = candles[candles.length - 1]?.close ?? 0;
@@ -69,8 +95,11 @@ export function calcSMC(candles: Candle[]): SMCResult {
       premiumDiscountPct: 50, premiumDiscountZone: "equilibrium",
       equilibrium: last, rangeHigh: last, rangeLow: last,
       buySideLiquidity: [], sellSideLiquidity: [],
+      potentialEntries: [],
     };
   }
+
+  const atr = calcATR(candles, 14);
 
   const { highs: swingHighs, lows: swingLows } = findSwings(candles, 5);
   const recentHighs = swingHighs.slice(-6);
@@ -132,7 +161,8 @@ export function calcSMC(candles: Candle[]): SMCResult {
         const mitigated = candles.slice(j + 1).some(
           (c) => c.close >= obLow && c.close <= obHigh
         );
-        orderBlocks.push({ type: "bullish", index: j, high: obHigh, low: obLow, mitigated });
+        const strength = mitigated ? 0 : scoreOB(candles[j], atr);
+        orderBlocks.push({ type: "bullish", index: j, high: obHigh, low: obLow, mitigated, strength });
         break;
       }
     }
@@ -147,7 +177,8 @@ export function calcSMC(candles: Candle[]): SMCResult {
         const mitigated = candles.slice(j + 1).some(
           (c) => c.close >= obLow && c.close <= obHigh
         );
-        orderBlocks.push({ type: "bearish", index: j, high: obHigh, low: obLow, mitigated });
+        const strength = mitigated ? 0 : scoreOB(candles[j], atr);
+        orderBlocks.push({ type: "bearish", index: j, high: obHigh, low: obLow, mitigated, strength });
         break;
       }
     }
@@ -164,14 +195,16 @@ export function calcSMC(candles: Candle[]): SMCResult {
       const gapTop = next.low;
       // Filled when a subsequent candle CLOSES into the gap zone (not just wicks).
       const filled = candles.slice(i + 2).some((c) => c.close <= gapTop && c.close >= gapBottom);
-      fairValueGaps.push({ type: "bullish", high: gapTop, low: gapBottom, index: i, filled });
+      const strength = filled ? 0 : scoreFVG(gapTop, gapBottom, atr);
+      fairValueGaps.push({ type: "bullish", high: gapTop, low: gapBottom, index: i, filled, strength });
     }
     // Bearish FVG: gap between next high and prev low [next.high, prev.low]
     if (prev.low > next.high) {
       const gapBottom = next.high;
       const gapTop = prev.low;
       const filled = candles.slice(i + 2).some((c) => c.close >= gapBottom && c.close <= gapTop);
-      fairValueGaps.push({ type: "bearish", high: gapTop, low: gapBottom, index: i, filled });
+      const strength = filled ? 0 : scoreFVG(gapTop, gapBottom, atr);
+      fairValueGaps.push({ type: "bearish", high: gapTop, low: gapBottom, index: i, filled, strength });
     }
   }
   // Keep only the 3 most recent per type
@@ -193,12 +226,37 @@ export function calcSMC(candles: Candle[]): SMCResult {
   const buySideLiquidity = swingHighs.slice(-5).map((s) => s.price).sort((a, b) => b - a);
   const sellSideLiquidity = swingLows.slice(-5).map((s) => s.price).sort((a, b) => a - b);
 
+  // ── Potential Entries (strong OB + FVG confluence) ────────────────────────
+  const potentialEntries: PotentialEntry[] = [];
+  const strongOBs = orderBlocks.filter((ob) => !ob.mitigated && ob.strength >= 50);
+  const strongFVGs = activeFVGs.filter((f) => !f.filled && f.strength >= 30);
+
+  for (const ob of strongOBs) {
+    for (const fvg of strongFVGs) {
+      if (ob.type !== fvg.type) continue;
+      const overlaps = ob.low <= fvg.high && ob.high >= fvg.low;
+      const obMid = (ob.high + ob.low) / 2;
+      const fvgMid = (fvg.high + fvg.low) / 2;
+      const proximity = Math.abs(obMid - fvgMid);
+      if (overlaps || proximity <= atr) {
+        const zoneHigh = Math.max(ob.high, fvg.high);
+        const zoneLow = Math.min(ob.low, fvg.low);
+        const zoneMid = (zoneHigh + zoneLow) / 2;
+        const confluenceScore = Math.round((ob.strength + fvg.strength) / 2);
+        const distancePct = close > 0 ? Math.abs(close - zoneMid) / close * 100 : 0;
+        potentialEntries.push({ type: ob.type, zoneHigh, zoneLow, confluenceScore, obStrength: ob.strength, fvgStrength: fvg.strength, distancePct });
+      }
+    }
+  }
+  potentialEntries.sort((a, b) => b.confluenceScore - a.confluenceScore);
+
   return {
     trend, swingHighs, swingLows,
     lastBOS, lastCHoCH,
     orderBlocks, fairValueGaps: activeFVGs,
     premiumDiscountPct, premiumDiscountZone, equilibrium, rangeHigh, rangeLow,
     buySideLiquidity, sellSideLiquidity,
+    potentialEntries,
   };
 }
 
