@@ -42,6 +42,7 @@ class MasterState(TypedDict):
     step_count: int
     max_steps: int
     user_feedback: str
+    model: str
 
 
 # ---------------------------------------------------------------------------
@@ -294,7 +295,7 @@ class MasterGemini:
                 Content(role="user", parts=[Part.from_text(text=state["agent_response"])])
             )
 
-        response = agent(state["chat_history"], system_instruction=_MASTER_SYSTEM_INSTRUCTION)
+        response = agent(state["chat_history"], system_instruction=_MASTER_SYSTEM_INSTRUCTION, model=state["model"])
         print("Master Agent response:", response)
         print("*" * 20)
 
@@ -306,7 +307,7 @@ class MasterGemini:
         try:
             state["user_feedback"] = f"# Tool Agent — step {state['step_count']}"
 
-            response = agent(state["chat_history"], tools=[cx_connector.tools])
+            response = agent(state["chat_history"], tools=[cx_connector.tools], model=state["model"])
             print("Tool Agent response:", response)
             print("*" * 20)
 
@@ -348,6 +349,7 @@ class MasterGemini:
             response = agent(
                 state["chat_history"],
                 system_instruction=_ANALYSIS_SYSTEM_INSTRUCTION,
+                model=state["model"],
             )
             print("Analysis Agent response:", response)
             print("*" * 20)
@@ -366,6 +368,7 @@ class MasterGemini:
             response = agent(
                 state["chat_history"],
                 system_instruction=_DECISION_SYSTEM_INSTRUCTION,
+                model=state["model"],
             )
             print("Decision Agent response:", response)
             print("*" * 20)
@@ -384,7 +387,7 @@ class MasterGemini:
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
-    def __call__(self, prompt: str, session_id: str = "default_session"):
+    def __call__(self, prompt: str, session_id: str = "default_session", model: str = "gemini-2.5-flash"):
         initial_state: MasterState = {
             "agent_response": "",
             "chat_history": [],
@@ -392,6 +395,7 @@ class MasterGemini:
             "step_count": 0,
             "max_steps": 10,
             "user_feedback": "",
+            "model": model,
         }
         graph_config = {"configurable": {"thread_id": session_id}}
 

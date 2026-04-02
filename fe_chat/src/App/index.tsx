@@ -13,8 +13,13 @@ import { useTheme } from "../hooks/useTheme";
 import { fetchModels, type AgentId, type AIModel } from "../services/chatService";
 
 const FALLBACK_AGENTS: AIModel[] = [
-  { id: "gemini", label: "Gemini", model: "2.5 Flash" },
-  { id: "claude", label: "Claude", model: "Opus 4.6" },
+  { id: "gemini", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
+  { id: "gemini", label: "Gemini 2.5 Pro", model: "gemini-2.5-pro" },
+  { id: "gemini", label: "Gemini 2.0 Flash", model: "gemini-2.0-flash" },
+  { id: "gemini", label: "Gemini 1.5 Pro", model: "gemini-1.5-pro" },
+  { id: "gemini", label: "Gemini 1.5 Flash", model: "gemini-1.5-flash" },
+  { id: "claude", label: "Claude", model: "claude-opus-4-6" },
+  { id: "chatgpt", label: "ChatGPT", model: "gpt-4o" },
 ];
 
 function getUrlParams(): { coin: string; tf: Timeframe } {
@@ -37,7 +42,8 @@ export default function App() {
   const [agents, setAgents] = useState<AIModel[]>(FALLBACK_AGENTS);
   const [selectedAgent, setSelectedAgent] = useState<AgentId>("gemini");
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
-  const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(selectedAgent);
+  const activeAgent = agents.find((a) => a.id === selectedAgent) ?? agents[0];
+  const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(selectedAgent, activeAgent.model);
   const [selectedCoin, setSelectedCoin] = useState(() => getUrlParams().coin);
   const [timeframe, setTimeframe] = useState<Timeframe>(() => getUrlParams().tf);
   const [showLeverage, setShowLeverage] = useState(false);
@@ -50,8 +56,6 @@ export default function App() {
       })
       .catch(() => {/* keep fallback */});
   }, []);
-
-  const activeAgent = agents.find((a) => a.id === selectedAgent) ?? agents[0];
 
   const handleCoinChange = (coin: string) => {
     setSelectedCoin(coin);

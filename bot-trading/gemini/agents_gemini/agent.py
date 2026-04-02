@@ -17,15 +17,16 @@ _client = Client(
 class Agent:
     """Thin wrapper around the Gemini generate_content API."""
 
-    def __call__(self, contents, tools=None, system_instruction=None):
+    def __call__(self, contents, tools=None, system_instruction=None, model=None):
         response = _client.models.generate_content(
-            model=GEMINI_MODEL,
+            model=model or GEMINI_MODEL,
             contents=contents,
             config=GenerateContentConfig(
                 tools=tools,
                 thinking_config=ThinkingConfig(include_thoughts=True),
                 temperature=0.2,
                 seed=42,
+                max_output_tokens=2048,
                 system_instruction=system_instruction,
             ),
         )

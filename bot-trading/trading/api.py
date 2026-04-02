@@ -6,8 +6,13 @@ from src.binance_connector.binance import BinanceConnector
 trading = APIRouter()
 
 AI_MODELS = [
-    {"id": "gemini", "label": "Gemini", "model": "2.5 Flash"},
-    {"id": "claude", "label": "Claude", "model": "Opus 4.6"},
+    {"id": "gemini", "label": "Gemini 2.5 Flash", "model": "gemini-2.5-flash"},
+    {"id": "gemini", "label": "Gemini 2.5 Pro", "model": "gemini-2.5-pro"},
+    {"id": "gemini", "label": "Gemini 2.0 Flash", "model": "gemini-2.0-flash"},
+    {"id": "gemini", "label": "Gemini 1.5 Pro", "model": "gemini-1.5-pro"},
+    {"id": "gemini", "label": "Gemini 1.5 Flash", "model": "gemini-1.5-flash"},
+    {"id": "claude", "label": "Claude", "model": "claude-opus-4-6"},
+    {"id": "chatgpt", "label": "ChatGPT", "model": "gpt-4o"},
 ]
 
 

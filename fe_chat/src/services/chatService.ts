@@ -16,12 +16,13 @@ export async function fetchModels(): Promise<AIModel[]> {
 export function streamChat(
   query: string,
   agent: AgentId,
+  model: string,
   onCharacter: (char: string) => void,
   onEnd: () => void,
   onError: () => void
 ): EventSource {
   const eventSource = new EventSource(
-    `${BOT_BASE_URL}/${agent}/stream?query=${encodeURIComponent(query)}`
+    `${BOT_BASE_URL}/${agent}/${model}/stream?query=${encodeURIComponent(query)}`
   );
 
   eventSource.onmessage = (event) => {

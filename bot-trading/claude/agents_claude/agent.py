@@ -8,12 +8,12 @@ _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
 class Agent:
     """Thin wrapper around the Claude messages API with extended thinking."""
 
-    def __call__(self, messages, tools=None, system=None):
+    def __call__(self, messages, tools=None, system=None, model=None):
         kwargs = {
-            "model": CLAUDE_MODEL,
-            "max_tokens": 16000,
+            "model": model or CLAUDE_MODEL,
+            "max_tokens": 2048,
             "messages": messages,
-            "thinking": {"type": "enabled", "budget_tokens": 8000},
+            "thinking": {"type": "enabled", "budget_tokens": 1024},
         }
         if system:
             kwargs["system"] = system

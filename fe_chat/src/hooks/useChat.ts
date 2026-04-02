@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ChatMessage } from "../App/types";
 import { streamChat, type AgentId } from "../services/chatService";
 
-export function useChat(agent: AgentId) {
+export function useChat(agent: AgentId, model: string) {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,6 +21,7 @@ export function useChat(agent: AgentId) {
     streamChat(
       messageToSend,
       agent,
+      model,
       (char) => {
         fullMessage += char;
         setChatHistory((prev) => {

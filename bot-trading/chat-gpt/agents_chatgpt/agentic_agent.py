@@ -1,11 +1,14 @@
 import json
+import importlib
 from typing import List
 from typing_extensions import TypedDict
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END
 
-from claude.agents_claude.agent import Agent
+_agent_module = importlib.import_module('chat-gpt.agents_chatgpt.agent')
+Agent = _agent_module.Agent
+
 from src.tools.cx_connector import CXConnector
 
 # ---------------------------------------------------------------------------
@@ -15,10 +18,8 @@ memory = InMemorySaver()
 agent = Agent()
 cx_connector = CXConnector()
 
-# Separator appended after every streamed user_feedback chunk
 _FEEDBACK_SEPARATOR = "\n *********************** \n"
 
-# Routing map: JSON "type" value -> graph node name
 _ROUTE_MAP = {
     "TOOL_AGENT": "tools_agent",
     "MARKET_ANALYSIS": "analysis_agent",
@@ -27,51 +28,31 @@ _ROUTE_MAP = {
     "FINAL_RESPONSE": "generate_response",
 }
 
-# Fallback agent_response used when none is present in state
 _DEFAULT_RESPONSE = '{"type": "GENERAL_QUERY"}'
 
-# Claude-format tool definitions (mirrors cx_connector.tools for Gemini)
-_CLAUDE_TOOLS = [
+_CHATGPT_TOOLS = [
     {
-        "name": "create_order",
-        "description": "Save a 20x leverage trade setup with entry, stop loss, and take profit on Binance Futures.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "symbol": {
-                    "type": "string",
-                    "description": "The trading pair symbol (e.g., 'SOLUSDT').",
+        "type": "function",
+        "function": {
+            "name": "create_order",
+            "description": "Save a 20x leverage trade setup with entry, stop loss, and take profit on Binance Futures.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Trading pair symbol (e.g. 'SOLUSDT')."},
+                    "current_price": {"type": "number", "description": "Current market price."},
+                    "side": {"type": "string", "description": "Order side: 'BUY' or 'SELL'."},
+                    "entry": {"type": "number", "description": "Entry price."},
+                    "stop_loss": {"type": "string", "description": "Stop loss price as string float."},
+                    "take_profit": {"type": "string", "description": "Take profit price as string float."},
                 },
-                "current_price": {
-                    "type": "number",
-                    "description": "Current market price for the symbol.",
-                },
-                "side": {
-                    "type": "string",
-                    "description": "Type of order (e.g., 'BUY', 'SELL').",
-                },
-                "entry": {
-                    "type": "number",
-                    "description": "Entry price for the trade.",
-                },
-                "stop_loss": {
-                    "type": "string",
-                    "description": "Stop loss price for the trade. String representation of a float.",
-                },
-                "take_profit": {
-                    "type": "string",
-                    "description": "Take profit price for the trade. String representation of a float.",
-                },
+                "required": ["symbol", "side", "entry", "take_profit", "stop_loss"],
             },
-            "required": ["symbol", "side", "entry", "take_profit", "stop_loss"],
         },
     }
 ]
 
 
-# ---------------------------------------------------------------------------
-# LangGraph state
-# ---------------------------------------------------------------------------
 class MasterState(TypedDict):
     chat_history: List[dict]
     agent_response: str
@@ -82,9 +63,6 @@ class MasterState(TypedDict):
     model: str
 
 
-# ---------------------------------------------------------------------------
-# System instructions
-# ---------------------------------------------------------------------------
 _MASTER_SYSTEM_INSTRUCTION = """
 You are the Master Agent of an AI cryptocurrency trading system.
 
@@ -187,16 +165,10 @@ Respond in JSON format:
 """
 
 
-# ---------------------------------------------------------------------------
-# Orchestrator
-# ---------------------------------------------------------------------------
-class MasterClaude:
+class MasterChatGPT:
     def __init__(self):
         self.graph = self._build_graph()
 
-    # ------------------------------------------------------------------
-    # Graph construction
-    # ------------------------------------------------------------------
     def _build_graph(self):
         workflow = StateGraph(MasterState)
 
@@ -260,9 +232,6 @@ class MasterClaude:
 
         return workflow.compile(checkpointer=memory)
 
-    # ------------------------------------------------------------------
-    # Router
-    # ------------------------------------------------------------------
     def _routing(self, state: MasterState) -> str:
         if state["step_count"] >= state["max_steps"]:
             return "generate_response"
@@ -278,43 +247,47 @@ class MasterClaude:
         type_value = data.get("type", "GENERAL_QUERY")
         return _ROUTE_MAP.get(type_value, "master_agent")
 
-    # ------------------------------------------------------------------
-    # Helper: parse thinking + text out of a Claude response
-    # ------------------------------------------------------------------
     def _parse_response(self, response) -> dict:
-        """Return {"thought": str, "agent_response": str, "raw_content": list}."""
-        thought = ""
-        agent_response = ""
-
-        for block in response.content:
-            if block.type == "thinking":
-                thought = block.thinking
-            elif block.type == "text":
-                agent_response += block.text
+        """Return {"thought": str, "agent_response": str, "tool_calls": list|None}."""
+        message = response.choices[0].message
+        agent_response = message.content or ""
+        tool_calls = message.tool_calls  # list of ChatCompletionMessageToolCall or None
 
         return {
-            "thought": thought,
+            "thought": "",
             "agent_response": agent_response.strip(),
-            "raw_content": response.content,
+            "tool_calls": tool_calls,
+            "message": message,
         }
 
-    # ------------------------------------------------------------------
-    # Helper: apply parsed response fields back onto state
-    # ------------------------------------------------------------------
     def _apply_parsed_response(self, state: MasterState, parsed: dict) -> None:
-        """Mutate state in-place with thought and agent_response from parsed."""
-        if parsed["thought"]:
-            state["user_feedback"] = parsed["thought"]
-        if parsed["agent_response"]:
-            state["agent_response"] = parsed["agent_response"]
-            # Append full assistant message (including thinking blocks) for continuity
-            state["chat_history"].append(
-                {"role": "assistant", "content": parsed["raw_content"]}
-            )
+        message = parsed["message"]
+        tool_calls = parsed["tool_calls"]
 
-    # ------------------------------------------------------------------
-    # Nodes
-    # ------------------------------------------------------------------
+        if tool_calls:
+            # Append full assistant message with tool_calls for OpenAI continuity
+            state["chat_history"].append({
+                "role": "assistant",
+                "content": parsed["agent_response"] or None,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in tool_calls
+                ],
+            })
+        elif parsed["agent_response"]:
+            state["agent_response"] = parsed["agent_response"]
+            state["chat_history"].append({
+                "role": "assistant",
+                "content": parsed["agent_response"],
+            })
+
     def _init_flow(self, state: MasterState) -> MasterState:
         state["user_feedback"] = "# Starting flow"
         return state
@@ -335,7 +308,10 @@ class MasterClaude:
         print("Master Agent response:", response)
         print("*" * 20)
 
-        self._apply_parsed_response(state, self._parse_response(response))
+        parsed = self._parse_response(response)
+        if parsed["agent_response"]:
+            state["agent_response"] = parsed["agent_response"]
+        self._apply_parsed_response(state, parsed)
         state["step_count"] += 1
         return state
 
@@ -343,40 +319,26 @@ class MasterClaude:
         try:
             state["user_feedback"] = f"# Tool Agent — step {state['step_count']}"
 
-            response = agent(state["chat_history"], tools=_CLAUDE_TOOLS, model=state["model"])
+            response = agent(state["chat_history"], tools=_CHATGPT_TOOLS, model=state["model"])
             print("Tool Agent response:", response)
             print("*" * 20)
 
             parsed = self._parse_response(response)
+            self._apply_parsed_response(state, parsed)
 
-            # Append the assistant message (may contain tool_use blocks)
-            state["chat_history"].append(
-                {"role": "assistant", "content": response.content}
-            )
-
-            if parsed["thought"]:
-                state["user_feedback"] = parsed["thought"]
             if parsed["agent_response"]:
                 state["agent_response"] = parsed["agent_response"]
 
-            # Execute any tool_use blocks returned by Claude
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    tool_func = getattr(cx_connector, block.name)
-                    tool_result = tool_func(**block.input)
-                    tool_results.append(
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(tool_result),
-                        }
-                    )
-
-            if tool_results:
-                state["chat_history"].append(
-                    {"role": "user", "content": tool_results}
-                )
+            # Execute tool calls
+            if parsed["tool_calls"]:
+                for tc in parsed["tool_calls"]:
+                    tool_func = getattr(cx_connector, tc.function.name)
+                    tool_result = tool_func(**json.loads(tc.function.arguments))
+                    state["chat_history"].append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": json.dumps(tool_result),
+                    })
 
             state["step_count"] += 1
             return state
@@ -388,15 +350,14 @@ class MasterClaude:
         try:
             state["user_feedback"] = f"# Analysis Agent — step {state['step_count']}"
 
-            response = agent(
-                state["chat_history"],
-                system=_ANALYSIS_SYSTEM_INSTRUCTION,
-                model=state["model"],
-            )
+            response = agent(state["chat_history"], system=_ANALYSIS_SYSTEM_INSTRUCTION, model=state["model"])
             print("Analysis Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            parsed = self._parse_response(response)
+            if parsed["agent_response"]:
+                state["agent_response"] = parsed["agent_response"]
+            self._apply_parsed_response(state, parsed)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -407,15 +368,14 @@ class MasterClaude:
         try:
             state["user_feedback"] = f"# Decision Agent — step {state['step_count']}"
 
-            response = agent(
-                state["chat_history"],
-                system=_DECISION_SYSTEM_INSTRUCTION,
-                model=state["model"],
-            )
+            response = agent(state["chat_history"], system=_DECISION_SYSTEM_INSTRUCTION, model=state["model"])
             print("Decision Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            parsed = self._parse_response(response)
+            if parsed["agent_response"]:
+                state["agent_response"] = parsed["agent_response"]
+            self._apply_parsed_response(state, parsed)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -426,10 +386,7 @@ class MasterClaude:
         state["user_feedback"] = ""
         return state
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-    def __call__(self, prompt: str, session_id: str = "default_session", model: str = "claude-opus-4-6"):
+    def __call__(self, prompt: str, session_id: str = "default_session", model: str = "gpt-4o"):
         initial_state: MasterState = {
             "agent_response": "",
             "chat_history": [],
