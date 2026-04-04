@@ -257,7 +257,19 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid var(--border-subtle);
+}
+
+.workspace-divider {
+  width: 5px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: var(--border-subtle);
+  transition: background 0.15s;
+}
+
+.workspace-divider:hover,
+.workspace-divider:active {
+  background: var(--accent, #4f8ef7);
 }
 
 /* ── Chart Panel ──────────────────────────────────── */

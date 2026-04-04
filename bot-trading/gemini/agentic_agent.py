@@ -177,6 +177,7 @@ class MasterGemini:
             "master_agent",
             self._routing,
             {
+                "master_agent": "master_agent",
                 "tools_agent": "tools_agent",
                 "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",

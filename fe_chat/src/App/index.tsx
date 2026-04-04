@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import "../App.css";
 import { TIMEFRAMES, type Timeframe } from "../constants";
 import { coins } from "../coins";
@@ -47,6 +47,39 @@ export default function App() {
   const [selectedCoin, setSelectedCoin] = useState(() => getUrlParams().coin);
   const [timeframe, setTimeframe] = useState<Timeframe>(() => getUrlParams().tf);
   const [showLeverage, setShowLeverage] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(380);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = sidebarWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = startX.current - e.clientX;
+      const newWidth = Math.min(600, Math.max(260, startWidth.current + delta));
+      setSidebarWidth(newWidth);
+    };
+    const onMouseUp = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
 
   useEffect(() => {
     fetchModels()
@@ -103,7 +136,8 @@ export default function App() {
             theme={theme}
           />
         </div>
-        <aside className="chat-sidebar">
+        <div className="workspace-divider" onMouseDown={onDragStart} />
+        <aside className="chat-sidebar" style={{ width: sidebarWidth, flexShrink: 0 }}>
           <div className="chat-header">
             <div className="chat-header-title">
               <div className="chat-online-dot" />
