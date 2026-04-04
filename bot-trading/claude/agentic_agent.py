@@ -4,9 +4,8 @@ from typing_extensions import TypedDict
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END
-from google.genai.types import Content, Part
 
-from gemini.agents_gemini.agent import Agent
+from claude.agent import Agent
 from src.tools.cx_connector import CXConnector
 
 # ---------------------------------------------------------------------------
@@ -31,12 +30,50 @@ _ROUTE_MAP = {
 # Fallback agent_response used when none is present in state
 _DEFAULT_RESPONSE = '{"type": "GENERAL_QUERY"}'
 
+# Claude-format tool definitions (mirrors cx_connector.tools for Gemini)
+_CLAUDE_TOOLS = [
+    {
+        "name": "create_order",
+        "description": "Save a 20x leverage trade setup with entry, stop loss, and take profit on Binance Futures.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "symbol": {
+                    "type": "string",
+                    "description": "The trading pair symbol (e.g., 'SOLUSDT').",
+                },
+                "current_price": {
+                    "type": "number",
+                    "description": "Current market price for the symbol.",
+                },
+                "side": {
+                    "type": "string",
+                    "description": "Type of order (e.g., 'BUY', 'SELL').",
+                },
+                "entry": {
+                    "type": "number",
+                    "description": "Entry price for the trade.",
+                },
+                "stop_loss": {
+                    "type": "string",
+                    "description": "Stop loss price for the trade. String representation of a float.",
+                },
+                "take_profit": {
+                    "type": "string",
+                    "description": "Take profit price for the trade. String representation of a float.",
+                },
+            },
+            "required": ["symbol", "side", "entry", "take_profit", "stop_loss"],
+        },
+    }
+]
+
 
 # ---------------------------------------------------------------------------
 # LangGraph state
 # ---------------------------------------------------------------------------
 class MasterState(TypedDict):
-    chat_history: List[Content]
+    chat_history: List[dict]
     agent_response: str
     user_prompt: str
     step_count: int
@@ -66,6 +103,9 @@ Standard flow for a trade request:
 2. Route to TRADE_DECISION once analysis is complete.
 3. If a trade is decided, route to TOOL_AGENT to place the order.
 4. Route to FINAL_RESPONSE to deliver the outcome.
+
+For simple greetings or general questions with no market data, route immediately
+to FINAL_RESPONSE.
 
 Respond in JSON format:
 {
@@ -123,7 +163,7 @@ Decision rules:
 - Only decide BUY or SELL when there are at least 2 strong confluences
   (e.g. bullish order block + FVG fill + RSI oversold, or BOS confirmation
   + EMA stack alignment + liquidity sweep).
-- If confluences are weak, conflicting, or market structure is unclear → WAIT.
+- If confluences are weak, conflicting, or market structure is unclear -> WAIT.
 - Never chase price; entry must be at a defined level (order block, FVG, or
   a retest of a broken structure level).
 - Stop loss must be placed beyond the invalidation level (below OB for longs,
@@ -149,11 +189,17 @@ Respond in JSON format:
 }
 """
 
+_FINAL_RESPONSE_SYSTEM = """
+You are a helpful cryptocurrency trading assistant.
+Summarise the analysis and any trading decisions made so far in a clear,
+friendly response for the user. Write in plain prose — no JSON.
+"""
+
 
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
-class MasterGemini:
+class MasterClaude:
     def __init__(self):
         self.graph = self._build_graph()
 
@@ -170,9 +216,9 @@ class MasterGemini:
         workflow.add_node("decision_agent", self._decision_agent)
         workflow.add_node("generate_response", self._generate_response)
 
-        # init_flow always proceeds to master_agent
         workflow.add_edge("init_flow", "master_agent")
 
+        # master_agent can loop back to itself for GENERAL_QUERY or on parse errors
         workflow.add_conditional_edges(
             "master_agent",
             self._routing,
@@ -180,6 +226,7 @@ class MasterGemini:
                 "tools_agent": "tools_agent",
                 "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",
+                "master_agent": "master_agent",
                 "generate_response": "generate_response",
             },
         )
@@ -243,37 +290,58 @@ class MasterGemini:
         return _ROUTE_MAP.get(type_value, "master_agent")
 
     # ------------------------------------------------------------------
-    # Helper: parse thought + response text out of a Gemini response
+    # Helper: parse a plain string response from the Agent wrapper
     # ------------------------------------------------------------------
     def _parse_response(self, response) -> dict:
-        """Return ``{"thought": str, "agent_response": str}`` from a Gemini response."""
-        parts = response.candidates[0].content.parts
+        """
+        Return {"thought": str, "agent_response": str, "raw_content": str}.
 
+        The Agent wrapper (agent.py) returns a plain string via claude_agent_sdk.
+        There are no separate thinking blocks at this layer — the entire
+        response is the agent_response text.
+        """
+        if isinstance(response, str):
+            return {
+                "thought": "",
+                "agent_response": response.strip(),
+                "raw_content": response,
+            }
+
+        # Fallback: handle Anthropic SDK-style response objects if ever used
         thought = ""
         agent_response = ""
+        for block in response.content:
+            if block.type == "thinking":
+                thought = block.thinking
+            elif block.type == "text":
+                agent_response += block.text
 
-        for part in parts:
-            if hasattr(part, "thought") and part.thought:
-                thought = part.text.rstrip()
-            else:
-                agent_response += part.text if hasattr(part, "text") and part.text else ""
-
-        return {"thought": thought, "agent_response": agent_response.strip()}
+        return {
+            "thought": thought,
+            "agent_response": agent_response.strip(),
+            "raw_content": agent_response.strip(),
+        }
 
     # ------------------------------------------------------------------
     # Helper: apply parsed response fields back onto state
     # ------------------------------------------------------------------
-    def _apply_parsed_response(self, state: MasterState, parsed: dict) -> None:
-        """Mutate *state* in-place with thought and agent_response from *parsed*."""
-        if parsed["thought"]:
-            state["user_feedback"] = parsed["thought"]
+    def _apply_parsed_response(self, state: MasterState, parsed: dict, label: str = "") -> None:
+        """Mutate state in-place with thought and agent_response from parsed.
+
+        Always updates user_feedback so the streamed output shows the actual
+        agent response after every step, not just the step header.
+        """
+        # Prefer thought over raw response when both exist
+        response_text = parsed["thought"] or parsed["agent_response"]
+        if response_text:
+            header = f"{label}\n\n" if label else ""
+            state["user_feedback"] = header + response_text
+
         if parsed["agent_response"]:
             state["agent_response"] = parsed["agent_response"]
+            # Append assistant message as plain text for conversation continuity
             state["chat_history"].append(
-                Content(
-                    role="user",
-                    parts=[Part.from_text(text=parsed["agent_response"])],
-                )
+                {"role": "assistant", "content": parsed["raw_content"]}
             )
 
     # ------------------------------------------------------------------
@@ -284,57 +352,74 @@ class MasterGemini:
         return state
 
     def _call_master(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = f"# Master Agent — step {state['step_count']}"
+        label = f"# Master Agent — step {state['step_count']}"
+        state["user_feedback"] = label
 
         if state["step_count"] == 0:
+            # First call: initialise history with only the user's original prompt
             state["chat_history"] = [
-                Content(role="user", parts=[Part.from_text(text=state["user_prompt"])])
+                {"role": "user", "content": state["user_prompt"]}
             ]
-        else:
-            state["chat_history"].append(
-                Content(role="user", parts=[Part.from_text(text=state["agent_response"])])
-            )
 
-        response = agent(state["chat_history"], system_instruction=_MASTER_SYSTEM_INSTRUCTION, model=state["model"])
+        response = agent(state["chat_history"], system=_MASTER_SYSTEM_INSTRUCTION, model=state["model"])
         print("Master Agent response:", response)
         print("*" * 20)
 
-        self._apply_parsed_response(state, self._parse_response(response))
+        self._apply_parsed_response(state, self._parse_response(response), label=label)
         state["step_count"] += 1
         return state
 
     def _tool_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Tool Agent — step {state['step_count']}"
+            label = f"# Tool Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
-            response = agent(state["chat_history"], tools=[cx_connector.tools], model=state["model"])
+            # Pass the tool definitions as part of the system context since
+            # claude_agent_sdk does not support Anthropic-style tool_use blocks
+            tool_desc = json.dumps(_CLAUDE_TOOLS, indent=2)
+            system_with_tools = (
+                "You have access to the following tools. If you need to place a trade, "
+                "respond with a JSON object describing the tool call using the schema below.\n\n"
+                f"Available tools:\n{tool_desc}\n\n"
+                "If you decide to call a tool, respond with JSON in this format:\n"
+                '{"type": "TOOL_CALL", "tool": "<tool_name>", "args": {<tool arguments>}}\n'
+                "Otherwise respond with your normal JSON routing response."
+            )
+
+            response = agent(
+                state["chat_history"],
+                system=system_with_tools,
+                model=state["model"],
+            )
             print("Tool Agent response:", response)
             print("*" * 20)
 
             parsed = self._parse_response(response)
-            self._apply_parsed_response(state, parsed)
+            self._apply_parsed_response(state, parsed, label=label)
 
-            if not parsed["agent_response"]:
-                state["agent_response"] = ""
-
-            # Execute any function calls returned by the model
-            candidate = response.candidates[0]
-            for part in candidate.content.parts:
-                if hasattr(part, "function_call") and part.function_call:
-                    func_call = part.function_call
-                    tool_func = getattr(cx_connector, func_call.name)
-                    tool_result = tool_func(**dict(func_call.args))
-                    state["chat_history"].append(
-                        Content(
-                            role="user",
-                            parts=[
-                                Part.from_function_response(
-                                    name=func_call.name,
-                                    response=tool_result,
-                                )
-                            ],
+            # Check if the response contains a TOOL_CALL directive
+            raw = parsed["agent_response"].strip("`").removeprefix("json").strip()
+            try:
+                data = json.loads(raw)
+                if data.get("type") == "TOOL_CALL":
+                    tool_name = data.get("tool", "")
+                    tool_args = data.get("args", {})
+                    if hasattr(cx_connector, tool_name):
+                        tool_func = getattr(cx_connector, tool_name)
+                        tool_result = tool_func(**tool_args)
+                        tool_result_str = json.dumps(tool_result)
+                        state["chat_history"].append(
+                            {
+                                "role": "user",
+                                "content": f"Tool result for {tool_name}: {tool_result_str}",
+                            }
                         )
-                    )
+                        # Surface tool result in stream so client sees it
+                        state["user_feedback"] = f"{label}\n\n**Tool executed:** `{tool_name}`\n\n{tool_result_str}"
+                        # After tool execution route to final response
+                        state["agent_response"] = json.dumps({"type": "FINAL_RESPONSE"})
+            except (json.JSONDecodeError, Exception):
+                pass  # Not a tool call — treat as normal routing response
 
             state["step_count"] += 1
             return state
@@ -344,17 +429,18 @@ class MasterGemini:
 
     def _analyse_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Analysis Agent — step {state['step_count']}"
+            label = f"# Analysis Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(
                 state["chat_history"],
-                system_instruction=_ANALYSIS_SYSTEM_INSTRUCTION,
+                system=_ANALYSIS_SYSTEM_INSTRUCTION,
                 model=state["model"],
             )
             print("Analysis Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            self._apply_parsed_response(state, self._parse_response(response), label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -363,17 +449,18 @@ class MasterGemini:
 
     def _decision_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Decision Agent — step {state['step_count']}"
+            label = f"# Decision Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(
                 state["chat_history"],
-                system_instruction=_DECISION_SYSTEM_INSTRUCTION,
+                system=_DECISION_SYSTEM_INSTRUCTION,
                 model=state["model"],
             )
             print("Decision Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            self._apply_parsed_response(state, self._parse_response(response), label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -381,13 +468,47 @@ class MasterGemini:
             return state
 
     def _generate_response(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = ""
+        """
+        Generate the final human-readable response and surface it via user_feedback
+        so it is streamed to the client character by character.
+
+        If the last agent_response already looks like a plain-text answer
+        (i.e. not a JSON routing object) we use it directly.  Otherwise we
+        call Claude one more time to produce a friendly summary.
+        """
+        raw = state.get("agent_response", "").strip()
+
+        # Detect whether agent_response is a JSON routing object
+        cleaned = raw.strip("`").removeprefix("json").strip()
+        is_routing_json = False
+        try:
+            data = json.loads(cleaned)
+            if isinstance(data, dict) and "type" in data:
+                is_routing_json = True
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        if is_routing_json or not raw:
+            # The last agent_response is a routing directive, not a human answer.
+            # Ask Claude to produce a final summary based on the full history.
+            final_prompt = (
+                "Based on the conversation so far, write a clear, concise final "
+                "answer for the user. Do not use JSON — write in plain prose."
+            )
+            history = list(state.get("chat_history", []))
+            history.append({"role": "user", "content": final_prompt})
+            final_text = agent(history, system=_FINAL_RESPONSE_SYSTEM, model=state["model"])
+            state["user_feedback"] = final_text or raw
+        else:
+            # The last agent_response already contains the human-readable answer
+            state["user_feedback"] = raw
+
         return state
 
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
-    def __call__(self, prompt: str, session_id: str = "default_session", model: str = "gemini-2.5-flash"):
+    def __call__(self, prompt: str, session_id: str = "default_session", model: str = "claude-opus-4-6"):
         initial_state: MasterState = {
             "agent_response": "",
             "chat_history": [],

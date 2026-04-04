@@ -40,10 +40,10 @@ function updateUrlParam(key: string, value: string) {
 export default function App() {
   const [theme, toggleTheme] = useTheme();
   const [agents, setAgents] = useState<AIModel[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<AgentId>("gemini");
+  const [selectedAgent, setSelectedAgent] = useState<AIModel | null>(null);
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
-  const activeAgent = agents.find((a) => a.id === selectedAgent) ?? agents[0];
-  const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(selectedAgent, activeAgent.model);
+  const activeAgent = selectedAgent ?? { id: "gemini" as AgentId, model: "", label: "" };
+  const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(activeAgent.id, activeAgent.model);
   const [selectedCoin, setSelectedCoin] = useState(() => getUrlParams().coin);
   const [timeframe, setTimeframe] = useState<Timeframe>(() => getUrlParams().tf);
   const [showLeverage, setShowLeverage] = useState(false);
@@ -52,7 +52,7 @@ export default function App() {
     fetchModels()
       .then((data) => {
         setAgents(data);
-        setSelectedAgent(data[0]?.id ?? "gemini");
+        setSelectedAgent(data[0] ?? null);
       })
       .catch(() => {/* keep fallback */ });
   }, []);
@@ -128,9 +128,9 @@ export default function App() {
                 <div className="agent-menu">
                   {agents.map((a) => (
                     <button
-                      key={a.id}
-                      className={`agent-menu-item${a.id === selectedAgent ? " active" : ""}`}
-                      onClick={() => { setSelectedAgent(a.id); setAgentMenuOpen(false); }}
+                      key={`${a.id}-${a.model}`}
+                      className={`agent-menu-item${a.model === selectedAgent?.model ? " active" : ""}`}
+                      onClick={() => { setSelectedAgent(a); setAgentMenuOpen(false); }}
                     >
                       <span className="agent-menu-label">{a.label}</span>
                       <span className="agent-menu-model">{a.model}</span>
