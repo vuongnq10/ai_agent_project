@@ -104,6 +104,9 @@ Standard flow for a trade request:
 3. If a trade is decided, route to TOOL_AGENT to place the order.
 4. Route to FINAL_RESPONSE to deliver the outcome.
 
+For simple greetings or general questions with no market data, route immediately
+to FINAL_RESPONSE.
+
 Respond in JSON format:
 {
     "type": "CATEGORY",
@@ -160,7 +163,7 @@ Decision rules:
 - Only decide BUY or SELL when there are at least 2 strong confluences
   (e.g. bullish order block + FVG fill + RSI oversold, or BOS confirmation
   + EMA stack alignment + liquidity sweep).
-- If confluences are weak, conflicting, or market structure is unclear → WAIT.
+- If confluences are weak, conflicting, or market structure is unclear -> WAIT.
 - Never chase price; entry must be at a defined level (order block, FVG, or
   a retest of a broken structure level).
 - Stop loss must be placed beyond the invalidation level (below OB for longs,
@@ -186,6 +189,12 @@ Respond in JSON format:
 }
 """
 
+_FINAL_RESPONSE_SYSTEM = """
+You are a helpful cryptocurrency trading assistant.
+Summarise the analysis and any trading decisions made so far in a clear,
+friendly response for the user. Write in plain prose — no JSON.
+"""
+
 
 # ---------------------------------------------------------------------------
 # Orchestrator
@@ -209,6 +218,7 @@ class MasterClaude:
 
         workflow.add_edge("init_flow", "master_agent")
 
+        # master_agent can loop back to itself for GENERAL_QUERY or on parse errors
         workflow.add_conditional_edges(
             "master_agent",
             self._routing,
@@ -216,6 +226,7 @@ class MasterClaude:
                 "tools_agent": "tools_agent",
                 "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",
+                "master_agent": "master_agent",
                 "generate_response": "generate_response",
             },
         )
@@ -279,13 +290,26 @@ class MasterClaude:
         return _ROUTE_MAP.get(type_value, "master_agent")
 
     # ------------------------------------------------------------------
-    # Helper: parse thinking + text out of a Claude response
+    # Helper: parse a plain string response from the Agent wrapper
     # ------------------------------------------------------------------
     def _parse_response(self, response) -> dict:
-        """Return {"thought": str, "agent_response": str, "raw_content": list}."""
+        """
+        Return {"thought": str, "agent_response": str, "raw_content": str}.
+
+        The Agent wrapper (agent.py) returns a plain string via claude_agent_sdk.
+        There are no separate thinking blocks at this layer — the entire
+        response is the agent_response text.
+        """
+        if isinstance(response, str):
+            return {
+                "thought": "",
+                "agent_response": response.strip(),
+                "raw_content": response,
+            }
+
+        # Fallback: handle Anthropic SDK-style response objects if ever used
         thought = ""
         agent_response = ""
-
         for block in response.content:
             if block.type == "thinking":
                 thought = block.thinking
@@ -295,7 +319,7 @@ class MasterClaude:
         return {
             "thought": thought,
             "agent_response": agent_response.strip(),
-            "raw_content": response.content,
+            "raw_content": agent_response.strip(),
         }
 
     # ------------------------------------------------------------------
@@ -307,7 +331,7 @@ class MasterClaude:
             state["user_feedback"] = parsed["thought"]
         if parsed["agent_response"]:
             state["agent_response"] = parsed["agent_response"]
-            # Append full assistant message (including thinking blocks) for continuity
+            # Append assistant message as plain text for conversation continuity
             state["chat_history"].append(
                 {"role": "assistant", "content": parsed["raw_content"]}
             )
@@ -320,16 +344,16 @@ class MasterClaude:
         return state
 
     def _call_master(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = f"# Master Agent — step {state['step_count']}"
+        state["user_feedback"] = f"# Master Agent - step {state['step_count']}"
 
         if state["step_count"] == 0:
+            # First call: initialise history with only the user's original prompt
             state["chat_history"] = [
                 {"role": "user", "content": state["user_prompt"]}
             ]
-        else:
-            state["chat_history"].append(
-                {"role": "user", "content": state["agent_response"]}
-            )
+        # On subsequent calls the chat_history already contains the previous
+        # assistant response appended by _apply_parsed_response — no extra
+        # user message is needed here.
 
         response = agent(state["chat_history"], system=_MASTER_SYSTEM_INSTRUCTION, model=state["model"])
         print("Master Agent response:", response)
@@ -341,42 +365,61 @@ class MasterClaude:
 
     def _tool_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Tool Agent — step {state['step_count']}"
+            state["user_feedback"] = f"# Tool Agent - step {state['step_count']}"
 
-            response = agent(state["chat_history"], tools=_CLAUDE_TOOLS, model=state["model"])
+            # Pass the tool definitions as part of the system context since
+            # claude_agent_sdk does not support Anthropic-style tool_use blocks
+            tool_desc = json.dumps(_CLAUDE_TOOLS, indent=2)
+            system_with_tools = (
+                "You have access to the following tools. If you need to place a trade, "
+                "respond with a JSON object describing the tool call using the schema below.\n\n"
+                f"Available tools:\n{tool_desc}\n\n"
+                "If you decide to call a tool, respond with JSON in this format:\n"
+                '{"type": "TOOL_CALL", "tool": "<tool_name>", "args": {<tool arguments>}}\n'
+                "Otherwise respond with your normal JSON routing response."
+            )
+
+            response = agent(
+                state["chat_history"],
+                system=system_with_tools,
+                model=state["model"],
+            )
             print("Tool Agent response:", response)
             print("*" * 20)
 
             parsed = self._parse_response(response)
-
-            # Append the assistant message (may contain tool_use blocks)
-            state["chat_history"].append(
-                {"role": "assistant", "content": response.content}
-            )
 
             if parsed["thought"]:
                 state["user_feedback"] = parsed["thought"]
             if parsed["agent_response"]:
                 state["agent_response"] = parsed["agent_response"]
 
-            # Execute any tool_use blocks returned by Claude
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    tool_func = getattr(cx_connector, block.name)
-                    tool_result = tool_func(**block.input)
-                    tool_results.append(
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(tool_result),
-                        }
-                    )
+            # Append the assistant message as plain text
+            state["chat_history"].append(
+                {"role": "assistant", "content": parsed["raw_content"]}
+            )
 
-            if tool_results:
-                state["chat_history"].append(
-                    {"role": "user", "content": tool_results}
-                )
+            # Check if the response contains a TOOL_CALL directive
+            raw = parsed["agent_response"].strip("`").removeprefix("json").strip()
+            try:
+                data = json.loads(raw)
+                if data.get("type") == "TOOL_CALL":
+                    tool_name = data.get("tool", "")
+                    tool_args = data.get("args", {})
+                    if hasattr(cx_connector, tool_name):
+                        tool_func = getattr(cx_connector, tool_name)
+                        tool_result = tool_func(**tool_args)
+                        tool_result_str = json.dumps(tool_result)
+                        state["chat_history"].append(
+                            {
+                                "role": "user",
+                                "content": f"Tool result for {tool_name}: {tool_result_str}",
+                            }
+                        )
+                        # After tool execution route to final response
+                        state["agent_response"] = json.dumps({"type": "FINAL_RESPONSE"})
+            except (json.JSONDecodeError, Exception):
+                pass  # Not a tool call — treat as normal routing response
 
             state["step_count"] += 1
             return state
@@ -386,7 +429,7 @@ class MasterClaude:
 
     def _analyse_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Analysis Agent — step {state['step_count']}"
+            state["user_feedback"] = f"# Analysis Agent - step {state['step_count']}"
 
             response = agent(
                 state["chat_history"],
@@ -405,7 +448,7 @@ class MasterClaude:
 
     def _decision_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Decision Agent — step {state['step_count']}"
+            state["user_feedback"] = f"# Decision Agent - step {state['step_count']}"
 
             response = agent(
                 state["chat_history"],
@@ -423,7 +466,41 @@ class MasterClaude:
             return state
 
     def _generate_response(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = ""
+        """
+        Generate the final human-readable response and surface it via user_feedback
+        so it is streamed to the client character by character.
+
+        If the last agent_response already looks like a plain-text answer
+        (i.e. not a JSON routing object) we use it directly.  Otherwise we
+        call Claude one more time to produce a friendly summary.
+        """
+        raw = state.get("agent_response", "").strip()
+
+        # Detect whether agent_response is a JSON routing object
+        cleaned = raw.strip("`").removeprefix("json").strip()
+        is_routing_json = False
+        try:
+            data = json.loads(cleaned)
+            if isinstance(data, dict) and "type" in data:
+                is_routing_json = True
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        if is_routing_json or not raw:
+            # The last agent_response is a routing directive, not a human answer.
+            # Ask Claude to produce a final summary based on the full history.
+            final_prompt = (
+                "Based on the conversation so far, write a clear, concise final "
+                "answer for the user. Do not use JSON — write in plain prose."
+            )
+            history = list(state.get("chat_history", []))
+            history.append({"role": "user", "content": final_prompt})
+            final_text = agent(history, system=_FINAL_RESPONSE_SYSTEM, model=state["model"])
+            state["user_feedback"] = final_text or raw
+        else:
+            # The last agent_response already contains the human-readable answer
+            state["user_feedback"] = raw
+
         return state
 
     # ------------------------------------------------------------------

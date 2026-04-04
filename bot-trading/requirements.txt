@@ -1,4 +1,5 @@
 anthropic
+claude-agent-sdk @ git+https://github.com/anthropics/claude-agent-sdk-python.git
 fastapi
 langchain
 langchain-google-genai

@@ -11,7 +11,9 @@ AI_MODELS = [
     {"id": "gemini", "label": "Gemini 2.0 Flash", "model": "gemini-2.0-flash"},
     {"id": "gemini", "label": "Gemini 1.5 Pro", "model": "gemini-1.5-pro"},
     {"id": "gemini", "label": "Gemini 1.5 Flash", "model": "gemini-1.5-flash"},
-    {"id": "claude", "label": "Claude", "model": "claude-opus-4-6"},
+    {"id": "claude", "label": "Claude Opus 4.6", "model": "opus"},
+    {"id": "claude", "label": "Claude Sonnet 4.6", "model": "sonnet"},
+    {"id": "claude", "label": "Claude Haiku 4.5", "model": "haiku"},
     {"id": "chatgpt", "label": "ChatGPT", "model": "gpt-4o"},
 ]
 
