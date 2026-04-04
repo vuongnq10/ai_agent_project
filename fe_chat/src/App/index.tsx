@@ -109,7 +109,6 @@ export default function App() {
     <div className="app-container">
       <Header
         onClearChat={clearHistory}
-        coinList={<CoinList onCoinClick={handleCoinChange} selectedCoin={selectedCoin} />}
         symbol={selectedCoin}
         showLeverage={showLeverage}
         onToggleLeverage={() => setShowLeverage((v) => !v)}
@@ -122,6 +121,7 @@ export default function App() {
         </div>
       )}
       <div className="workspace">
+        <CoinList onCoinClick={handleCoinChange} selectedCoin={selectedCoin} />
         <div className="chart-workspace">
           <ChartPanel
             symbol={selectedCoin}

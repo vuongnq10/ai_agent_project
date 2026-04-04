@@ -2,7 +2,6 @@ import MarketBar from "../Chart/MarketBar";
 
 interface Props {
   onClearChat: () => void;
-  coinList: React.ReactNode;
   symbol: string;
   showLeverage: boolean;
   onToggleLeverage: () => void;
@@ -10,7 +9,7 @@ interface Props {
   onToggleTheme: () => void;
 }
 
-export default function Header({ onClearChat, coinList, symbol, showLeverage, onToggleLeverage, theme, onToggleTheme }: Props) {
+export default function Header({ onClearChat, symbol, showLeverage, onToggleLeverage, theme, onToggleTheme }: Props) {
   return (
     <header className="app-header">
       <div className="header-brand">
@@ -19,8 +18,6 @@ export default function Header({ onClearChat, coinList, symbol, showLeverage, on
       </div>
 
       <div className="header-vsep" />
-
-      <div className="header-coin">{coinList}</div>
 
       <div className="header-ticker">
         <MarketBar symbol={symbol} />
