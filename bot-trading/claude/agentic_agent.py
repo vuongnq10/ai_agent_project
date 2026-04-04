@@ -360,6 +360,12 @@ class MasterClaude:
             state["chat_history"] = [
                 {"role": "user", "content": state["user_prompt"]}
             ]
+        else:
+            # Re-entry: append the previous agent_response as a new user turn
+            # so master_agent has full context of what happened in prior steps
+            state["chat_history"].append(
+                {"role": "user", "content": state["agent_response"]}
+            )
 
         response = agent(state["chat_history"], system=_MASTER_SYSTEM_INSTRUCTION, model=state["model"])
         print("Master Agent response:", response)

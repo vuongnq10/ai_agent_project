@@ -11,13 +11,12 @@ interface Props {
   symbol: string;
   timeframe: Timeframe;
   onTimeframeChange: (tf: Timeframe) => void;
-  onAnalyze: (symbol: string, timeframe: Timeframe) => void;
   theme?: "light" | "dark";
 }
 
 const DEFAULT_ACTIVE = new Set<IndicatorId>(["ema9", "ema20", "ema50", "bb", "rsi"]);
 
-export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAnalyze, theme = "dark" }: Props) {
+export default function ChartPanel({ symbol, timeframe, onTimeframeChange, theme = "dark" }: Props) {
   const [smcMode, setSmcMode] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(DEFAULT_ACTIVE);
   const { candles, loading } = useCandles(symbol, timeframe);
@@ -55,14 +54,6 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, onAna
             </span>
             <span className="smc-toggle-label">SMC</span>
           </label>
-        </div>
-        <div className="controls-right">
-          <button className="analyze-btn" onClick={() => onAnalyze(symbol, timeframe)}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-            </svg>
-            AI Analyze
-          </button>
         </div>
       </div>
       {loading && candles.length === 0 ? (

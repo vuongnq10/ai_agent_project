@@ -100,11 +100,6 @@ export default function App() {
     updateUrlParam("tf", tf);
   };
 
-  const handleAnalyze = (symbol: string, tf: Timeframe) => {
-    const query = `Analyze ${symbol} on the ${tf} timeframe using Smart Money Concepts. Identify: trend direction, key support/resistance levels, order blocks, fair value gaps, BOS/CHoCH, liquidity levels, and suggest a trade setup with entry, stop loss, and take profit.`;
-    submit(query);
-  };
-
   const handleSubmit = (e: React.FormEvent, query?: string) => {
     e.preventDefault();
     submit(query);
@@ -132,7 +127,6 @@ export default function App() {
             symbol={selectedCoin}
             timeframe={timeframe}
             onTimeframeChange={handleTimeframeChange}
-            onAnalyze={handleAnalyze}
             theme={theme}
           />
         </div>
