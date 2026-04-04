@@ -12,15 +12,15 @@ import { useChat } from "../hooks/useChat";
 import { useTheme } from "../hooks/useTheme";
 import { fetchModels, type AgentId, type AIModel } from "../services/chatService";
 
-const FALLBACK_AGENTS: AIModel[] = [
-  { id: "gemini", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
-  { id: "gemini", label: "Gemini 2.5 Pro", model: "gemini-2.5-pro" },
-  { id: "gemini", label: "Gemini 2.0 Flash", model: "gemini-2.0-flash" },
-  { id: "gemini", label: "Gemini 1.5 Pro", model: "gemini-1.5-pro" },
-  { id: "gemini", label: "Gemini 1.5 Flash", model: "gemini-1.5-flash" },
-  { id: "claude", label: "Claude", model: "claude-opus-4-6" },
-  { id: "chatgpt", label: "ChatGPT", model: "gpt-4o" },
-];
+// const FALLBACK_AGENTS: AIModel[] = [
+//   { id: "gemini", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
+//   { id: "gemini", label: "Gemini 2.5 Pro", model: "gemini-2.5-pro" },
+//   { id: "gemini", label: "Gemini 2.0 Flash", model: "gemini-2.0-flash" },
+//   { id: "gemini", label: "Gemini 1.5 Pro", model: "gemini-1.5-pro" },
+//   { id: "gemini", label: "Gemini 1.5 Flash", model: "gemini-1.5-flash" },
+//   { id: "claude", label: "Claude", model: "claude-opus-4-6" },
+//   { id: "chatgpt", label: "ChatGPT", model: "gpt-4o" },
+// ];
 
 function getUrlParams(): { coin: string; tf: Timeframe } {
   const sp = new URLSearchParams(window.location.search);
@@ -39,7 +39,7 @@ function updateUrlParam(key: string, value: string) {
 
 export default function App() {
   const [theme, toggleTheme] = useTheme();
-  const [agents, setAgents] = useState<AIModel[]>(FALLBACK_AGENTS);
+  const [agents, setAgents] = useState<AIModel[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentId>("gemini");
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const activeAgent = agents.find((a) => a.id === selectedAgent) ?? agents[0];
@@ -54,7 +54,7 @@ export default function App() {
         setAgents(data);
         setSelectedAgent(data[0]?.id ?? "gemini");
       })
-      .catch(() => {/* keep fallback */});
+      .catch(() => {/* keep fallback */ });
   }, []);
 
   const handleCoinChange = (coin: string) => {

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import type { Candle } from "../App/types";
-import type { Timeframe } from "../constants";
-import { fetchCandles as fetchCandlesService } from "../services/binanceService";
+import { useState, useEffect, useCallback } from 'react';
+import type { Candle } from '../App/types';
+import type { Timeframe } from '../constants';
+import { fetchCandles as fetchCandlesService } from '../services/binanceService';
 
 export function useCandles(symbol: string, timeframe: Timeframe) {
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -13,7 +13,7 @@ export function useCandles(symbol: string, timeframe: Timeframe) {
       const data = await fetchCandlesService(sym, tf);
       setCandles(data);
     } catch (e) {
-      console.error("Failed to fetch candles", e);
+      console.error('Failed to fetch candles', e);
     } finally {
       setLoading(false);
     }
@@ -21,8 +21,8 @@ export function useCandles(symbol: string, timeframe: Timeframe) {
 
   useEffect(() => {
     load(symbol, timeframe);
-    const interval = setInterval(() => load(symbol, timeframe), 30000);
-    return () => clearInterval(interval);
+    // const interval = setInterval(() => load(symbol, timeframe), 30000);
+    // return () => clearInterval(interval);
   }, [symbol, timeframe, load]);
 
   return { candles, loading };

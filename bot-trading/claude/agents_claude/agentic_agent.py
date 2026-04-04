@@ -325,10 +325,18 @@ class MasterClaude:
     # ------------------------------------------------------------------
     # Helper: apply parsed response fields back onto state
     # ------------------------------------------------------------------
-    def _apply_parsed_response(self, state: MasterState, parsed: dict) -> None:
-        """Mutate state in-place with thought and agent_response from parsed."""
-        if parsed["thought"]:
-            state["user_feedback"] = parsed["thought"]
+    def _apply_parsed_response(self, state: MasterState, parsed: dict, label: str = "") -> None:
+        """Mutate state in-place with thought and agent_response from parsed.
+
+        Always updates user_feedback so the streamed output shows the actual
+        agent response after every step, not just the step header.
+        """
+        # Prefer thought over raw response when both exist
+        response_text = parsed["thought"] or parsed["agent_response"]
+        if response_text:
+            header = f"{label}\n\n" if label else ""
+            state["user_feedback"] = header + response_text
+
         if parsed["agent_response"]:
             state["agent_response"] = parsed["agent_response"]
             # Append assistant message as plain text for conversation continuity
@@ -344,28 +352,27 @@ class MasterClaude:
         return state
 
     def _call_master(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = f"# Master Agent - step {state['step_count']}"
+        label = f"# Master Agent — step {state['step_count']}"
+        state["user_feedback"] = label
 
         if state["step_count"] == 0:
             # First call: initialise history with only the user's original prompt
             state["chat_history"] = [
                 {"role": "user", "content": state["user_prompt"]}
             ]
-        # On subsequent calls the chat_history already contains the previous
-        # assistant response appended by _apply_parsed_response — no extra
-        # user message is needed here.
 
         response = agent(state["chat_history"], system=_MASTER_SYSTEM_INSTRUCTION, model=state["model"])
         print("Master Agent response:", response)
         print("*" * 20)
 
-        self._apply_parsed_response(state, self._parse_response(response))
+        self._apply_parsed_response(state, self._parse_response(response), label=label)
         state["step_count"] += 1
         return state
 
     def _tool_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Tool Agent - step {state['step_count']}"
+            label = f"# Tool Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             # Pass the tool definitions as part of the system context since
             # claude_agent_sdk does not support Anthropic-style tool_use blocks
@@ -388,16 +395,7 @@ class MasterClaude:
             print("*" * 20)
 
             parsed = self._parse_response(response)
-
-            if parsed["thought"]:
-                state["user_feedback"] = parsed["thought"]
-            if parsed["agent_response"]:
-                state["agent_response"] = parsed["agent_response"]
-
-            # Append the assistant message as plain text
-            state["chat_history"].append(
-                {"role": "assistant", "content": parsed["raw_content"]}
-            )
+            self._apply_parsed_response(state, parsed, label=label)
 
             # Check if the response contains a TOOL_CALL directive
             raw = parsed["agent_response"].strip("`").removeprefix("json").strip()
@@ -416,6 +414,8 @@ class MasterClaude:
                                 "content": f"Tool result for {tool_name}: {tool_result_str}",
                             }
                         )
+                        # Surface tool result in stream so client sees it
+                        state["user_feedback"] = f"{label}\n\n**Tool executed:** `{tool_name}`\n\n{tool_result_str}"
                         # After tool execution route to final response
                         state["agent_response"] = json.dumps({"type": "FINAL_RESPONSE"})
             except (json.JSONDecodeError, Exception):
@@ -429,7 +429,8 @@ class MasterClaude:
 
     def _analyse_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Analysis Agent - step {state['step_count']}"
+            label = f"# Analysis Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(
                 state["chat_history"],
@@ -439,7 +440,7 @@ class MasterClaude:
             print("Analysis Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            self._apply_parsed_response(state, self._parse_response(response), label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -448,7 +449,8 @@ class MasterClaude:
 
     def _decision_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Decision Agent - step {state['step_count']}"
+            label = f"# Decision Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(
                 state["chat_history"],
@@ -458,7 +460,7 @@ class MasterClaude:
             print("Decision Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            self._apply_parsed_response(state, self._parse_response(response), label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
