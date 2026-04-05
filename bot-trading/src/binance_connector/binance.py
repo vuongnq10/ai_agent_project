@@ -27,8 +27,8 @@ configuration = ConfigurationRestAPI(
 # EXPECTED_PROFIT = 2
 # EXPECTED_STOP_LOSS = 2
 
-LEVERAGE = 20
-ORDER_AMOUNT = 5
+LEVERAGE = 10
+ORDER_AMOUNT = 10
 EXPECTED_PROFIT = 0.40
 EXPECTED_STOP_LOSS = 0.30
 
@@ -61,7 +61,7 @@ class BinanceConnector:
         decimals = len(reference_str.split(".")[1]) if "." in reference_str else 0
         return round(value, decimals)
 
-    def create_orders(
+    def create_orders_default(
         self,
         symbol: str,
         side: str,
@@ -177,6 +177,109 @@ class BinanceConnector:
                     """
                 )
             )
+
+            return "success"
+        except Exception as e:
+            asyncio.create_task(
+                telegram_bot(
+                    f"""
+                    Error creating orders for {symbol} with side {side} and price {order_price}:
+                    {str(e)}
+                """
+                )
+            )
+            print(f"Error creating orders: {e}")
+            return None
+
+    def create_orders(
+        self,
+        symbol: str,
+        side: str,
+        order_price: float,
+        current_price: float,
+        take_profit: float,
+        stop_loss: float,
+    ):
+        if (side == "BUY" and order_price > current_price) or (
+            side == "SELL" and order_price < current_price
+        ):
+            asyncio.create_task(
+                telegram_bot(
+                    f"Order price {order_price} for {symbol} is not valid for current price {current_price} for side {side}"
+                )
+            )
+            return "Failed"
+
+        try:
+            symbol_config = self.get_exchange_info(symbol)
+            filter = symbol_config.get("filters", [])
+            price_filter = next(
+                (item for item in filter if item["filterType"] == "PRICE_FILTER"), None
+            )
+            lot_size_filter = next(
+                (item for item in filter if item["filterType"] == "LOT_SIZE"), None
+            )
+
+            quantity = self.match_precision(
+                (float(ORDER_AMOUNT) * LEVERAGE) / order_price,
+                lot_size_filter["stepSize"],
+            )
+            real_price = self.match_precision(order_price, price_filter["tickSize"])
+
+            orders = [
+                {
+                    "symbol": symbol,
+                    "side": side,
+                    "type": "LIMIT",
+                    "price": str(real_price),
+                    "quantity": str(quantity),
+                    "timeInForce": "GTC",  # GTE_GTC
+                },
+                {
+                    "symbol": symbol,
+                    "side": "BUY" if side == "SELL" else "SELL",
+                    "type": "TAKE_PROFIT_MARKET",
+                    "stopPrice": str(take_profit),
+                    "closePosition": "true",
+                    "timeInForce": "GTC",
+                    "firstTrigger": "PLACE_ORDER",
+                    "firstDrivenOn": "PARTIALLY_FILLED_OR_FILLED",
+                },
+                {
+                    "symbol": symbol,
+                    "side": "BUY" if side == "SELL" else "SELL",
+                    "type": "STOP_MARKET",
+                    "stopPrice": str(stop_loss),
+                    "closePosition": "true",
+                    "timeInForce": "GTC",
+                    "firstTrigger": "PLACE_ORDER",
+                    "firstDrivenOn": "PARTIALLY_FILLED_OR_FILLED",
+                },
+            ]
+
+            print(f"Creating orders: {orders}")
+
+            response = self.client.rest_api.place_multiple_orders(orders)
+
+            data = response.data()
+            result = [item.to_dict() for item in data]
+
+            asyncio.create_task(telegram_bot(result))
+
+            # asyncio.create_task(
+            #     telegram_bot(
+            #         f"""
+            #         🛒 Create an order for {symbol}  
+            #         ➡️ Side: {side}  
+            #         🏷️ Order Type: {side}  
+            #         💰 Current Price: ${current_price}  
+            #         🎯 Order Price: ${real_price}  
+            #         📦 Quantity: {quantity}  
+            #         📈 Profit Price: ${take_profit}  
+            #         🛑 Stop Price: ${stop_loss}  
+            #         """
+            #     )
+            # )
 
             return "success"
         except Exception as e:
