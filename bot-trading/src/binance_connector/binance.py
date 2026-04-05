@@ -226,43 +226,43 @@ class BinanceConnector:
             )
             real_price = self.match_precision(order_price, price_filter["tickSize"])
 
-            orders = [
-                {
-                    "symbol": symbol,
-                    "side": side,
-                    "type": "LIMIT",
-                    "price": str(real_price),
-                    "quantity": str(quantity),
-                    "timeInForce": "GTC",  # GTE_GTC
-                },
-                {
-                    "symbol": symbol,
-                    "side": "BUY" if side == "SELL" else "SELL",
-                    "type": "TAKE_PROFIT_MARKET",
-                    "stopPrice": str(take_profit),
-                    "closePosition": "true",
-                    "timeInForce": "GTC",
-                    "firstTrigger": "PLACE_ORDER",
-                    "firstDrivenOn": "PARTIALLY_FILLED_OR_FILLED",
-                },
-                {
-                    "symbol": symbol,
-                    "side": "BUY" if side == "SELL" else "SELL",
-                    "type": "STOP_MARKET",
-                    "stopPrice": str(stop_loss),
-                    "closePosition": "true",
-                    "timeInForce": "GTC",
-                    "firstTrigger": "PLACE_ORDER",
-                    "firstDrivenOn": "PARTIALLY_FILLED_OR_FILLED",
-                },
+            close_side = "BUY" if side == "SELL" else "SELL"
+
+            print(f"Placing LIMIT order: {symbol} {side} qty={quantity} price={real_price}")
+            limit_resp = self.client.rest_api.new_order(
+                symbol=symbol,
+                side=side,
+                type="LIMIT",
+                price=real_price,
+                quantity=quantity,
+                time_in_force="GTC",
+            )
+
+            print(f"Placing TAKE_PROFIT_MARKET order: stopPrice={take_profit}")
+            tp_resp = self.client.rest_api.new_order(
+                symbol=symbol,
+                side=close_side,
+                type="TAKE_PROFIT_MARKET",
+                stop_price=float(take_profit),
+                quantity=quantity,
+                reduce_only="true",
+            )
+
+            print(f"Placing STOP_MARKET order: stopPrice={stop_loss}")
+            sl_resp = self.client.rest_api.new_order(
+                symbol=symbol,
+                side=close_side,
+                type="STOP_MARKET",
+                stop_price=float(stop_loss),
+                quantity=quantity,
+                reduce_only="true",
+            )
+
+            result = [
+                limit_resp.data().to_dict(),
+                tp_resp.data().to_dict(),
+                sl_resp.data().to_dict(),
             ]
-
-            print(f"Creating orders: {orders}")
-
-            response = self.client.rest_api.place_multiple_orders(orders)
-
-            data = response.data()
-            result = [item.to_dict() for item in data]
 
             asyncio.create_task(telegram_bot(result))
 
