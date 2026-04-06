@@ -3,6 +3,10 @@
 # https://github.com/binance/binance-connector-python/blob/master/clients/derivatives_trading_usds_futures/src/binance_sdk_derivatives_trading_usds_futures/rest_api/rest_api.py
 import os
 import asyncio
+import time
+import hmac
+import hashlib
+import requests as http_requests
 
 from src.telegram.telegram import telegram_bot
 
@@ -224,11 +228,18 @@ class BinanceConnector:
                 (float(ORDER_AMOUNT) * LEVERAGE) / order_price,
                 lot_size_filter["stepSize"],
             )
+
             real_price = self.match_precision(order_price, price_filter["tickSize"])
+            tp_price = self.match_precision(
+                float(take_profit), price_filter["tickSize"]
+            )
+            sl_price = self.match_precision(float(stop_loss), price_filter["tickSize"])
 
             close_side = "BUY" if side == "SELL" else "SELL"
 
-            print(f"Placing LIMIT order: {symbol} {side} qty={quantity} price={real_price}")
+            print(
+                f"Placing LIMIT order: {symbol} {side} qty={quantity} price={real_price}"
+            )
             limit_resp = self.client.rest_api.new_order(
                 symbol=symbol,
                 side=side,
@@ -238,30 +249,36 @@ class BinanceConnector:
                 time_in_force="GTC",
             )
 
-            print(f"Placing TAKE_PROFIT_MARKET order: stopPrice={take_profit}")
-            tp_resp = self.client.rest_api.new_order(
-                symbol=symbol,
-                side=close_side,
-                type="TAKE_PROFIT_MARKET",
-                stop_price=float(take_profit),
-                quantity=quantity,
-                reduce_only="true",
+            print(f"Placing TAKE_PROFIT_MARKET algo order: triggerPrice={tp_price}")
+            tp_resp = self._place_algo_order(
+                {
+                    "symbol": symbol,
+                    "side": close_side,
+                    "type": "TAKE_PROFIT_MARKET",
+                    "triggerPrice": str(tp_price),
+                    "quantity": str(quantity),
+                    "reduceOnly": "true",
+                    "timeInForce": "GTC",
+                }
             )
 
-            print(f"Placing STOP_MARKET order: stopPrice={stop_loss}")
-            sl_resp = self.client.rest_api.new_order(
-                symbol=symbol,
-                side=close_side,
-                type="STOP_MARKET",
-                stop_price=float(stop_loss),
-                quantity=quantity,
-                reduce_only="true",
+            print(f"Placing STOP_MARKET algo order: triggerPrice={sl_price}")
+            sl_resp = self._place_algo_order(
+                {
+                    "symbol": symbol,
+                    "side": close_side,
+                    "type": "STOP_MARKET",
+                    "triggerPrice": str(sl_price),
+                    "quantity": str(quantity),
+                    "reduceOnly": "true",
+                    "timeInForce": "GTC",
+                }
             )
 
             result = [
                 limit_resp.data().to_dict(),
-                tp_resp.data().to_dict(),
-                sl_resp.data().to_dict(),
+                tp_resp,
+                sl_resp,
             ]
 
             asyncio.create_task(telegram_bot(result))
@@ -269,19 +286,19 @@ class BinanceConnector:
             # asyncio.create_task(
             #     telegram_bot(
             #         f"""
-            #         🛒 Create an order for {symbol}  
-            #         ➡️ Side: {side}  
-            #         🏷️ Order Type: {side}  
-            #         💰 Current Price: ${current_price}  
-            #         🎯 Order Price: ${real_price}  
-            #         📦 Quantity: {quantity}  
-            #         📈 Profit Price: ${take_profit}  
-            #         🛑 Stop Price: ${stop_loss}  
+            #         🛒 Create an order for {symbol}
+            #         ➡️ Side: {side}
+            #         🏷️ Order Type: {side}
+            #         💰 Current Price: ${current_price}
+            #         🎯 Order Price: ${real_price}
+            #         📦 Quantity: {quantity}
+            #         📈 Profit Price: ${take_profit}
+            #         🛑 Stop Price: ${stop_loss}
             #         """
             #     )
             # )
 
-            return "success"
+            return result
         except Exception as e:
             asyncio.create_task(
                 telegram_bot(
@@ -293,6 +310,27 @@ class BinanceConnector:
             )
             print(f"Error creating orders: {e}")
             return None
+
+    def _place_algo_order(self, params: dict) -> dict:
+        """Place a conditional order via POST /fapi/v1/algoOrder (Binance migration 2025-12-09)."""
+        params["algoType"] = "CONDITIONAL"
+        params["timestamp"] = int(time.time() * 1000)
+        query = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+        sig = hmac.new(
+            BINANCE_SECRET_KEY.encode(), query.encode(), hashlib.sha256
+        ).hexdigest()
+        url = f"{BINANCE_BASE_URL}/fapi/v1/algoOrder"
+        headers = {
+            "X-MBX-APIKEY": BINANCE_API_KEY,
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        resp = http_requests.post(
+            url, headers=headers, data=query + f"&signature={sig}"
+        )
+        data = resp.json()
+        if resp.status_code != 200:
+            raise Exception(data.get("msg", str(data)))
+        return data
 
     def set_leverage(self, symbol: str, leverage: int):
         try:
