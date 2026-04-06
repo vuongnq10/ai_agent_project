@@ -8,10 +8,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.binance_connector.binance import BinanceConnector
 
+# from src.binance_connector.binance_v2 import BinanceConnector
+
 # Constant test inputs
 SYMBOL = "BTCUSDT"
 SIDE = "BUY"
-ORDER_PRICE = 68000.0
+ORDER_PRICE = 70000.0
 CURRENT_PRICE = 69000.0
 TAKE_PROFIT = 83332.0
 STOP_LOSS = 67000.0

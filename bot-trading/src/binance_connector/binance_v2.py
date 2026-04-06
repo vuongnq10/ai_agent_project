@@ -1,35 +1,14 @@
-# https://github.com/binance/binance-connector-python/tree/master
-# https://github.com/binance/binance-connector-python/tree/master/clients/derivatives_trading_usds_futures
-# https://github.com/binance/binance-connector-python/blob/master/clients/derivatives_trading_usds_futures/src/binance_sdk_derivatives_trading_usds_futures/rest_api/rest_api.py
-import os
+# https://github.com/binance/binance-connector-python
+# Uses binance-connector-python (UMFutures) instead of binance_sdk_derivatives_trading_usds_futures
 import asyncio
-import time
-import hmac
-import hashlib
-import requests as http_requests
 
 from src.telegram.telegram import telegram_bot
-
-from binance_common.configuration import ConfigurationRestAPI
-from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futures import (
-    DerivativesTradingUsdsFutures,
-)
+from binance.um_futures import UMFutures
 import config
 
 BINANCE_API_KEY = config.BINANCE_API_KEY
 BINANCE_SECRET_KEY = config.BINANCE_SECRET_KEY
 BINANCE_BASE_URL = config.BINANCE_BASE_URL
-
-configuration = ConfigurationRestAPI(
-    api_key=BINANCE_API_KEY,
-    api_secret=BINANCE_SECRET_KEY,
-    base_path=BINANCE_BASE_URL,
-)
-
-# LEVERAGE = 20
-# ORDER_AMOUNT = 50
-# EXPECTED_PROFIT = 2
-# EXPECTED_STOP_LOSS = 2
 
 LEVERAGE = 10
 ORDER_AMOUNT = 10
@@ -42,14 +21,16 @@ class BinanceConnector:
         self.balance = 0
         self.positions = []
 
-        self.client = DerivativesTradingUsdsFutures(config_rest_api=configuration)
-        # self.get_balance()
+        self.client = UMFutures(
+            key=BINANCE_API_KEY,
+            secret=BINANCE_SECRET_KEY,
+            base_url=(
+                BINANCE_BASE_URL if BINANCE_BASE_URL else "https://fapi.binance.com"
+            ),
+        )
 
     def get_balance(self):
-
-        response = self.client.rest_api.account_information_v3()
-
-        value = response.data().to_dict()
+        value = self.client.account()
 
         assets = value.get("assets", [])
         for asset in assets:
@@ -134,7 +115,7 @@ class BinanceConnector:
                     "type": "LIMIT",
                     "price": str(real_price),
                     "quantity": str(quantity),
-                    "timeInForce": "GTC",  # GTE_GTC
+                    "timeInForce": "GTC",
                 },
                 {
                     "symbol": symbol,
@@ -160,24 +141,17 @@ class BinanceConnector:
 
             print(f"Creating orders: {orders}")
 
-            # response = self.client.rest_api.place_multiple_orders(orders)
-
-            # data = response.data()
-            # result = [item.to_dict() for item in data]
-
-            # asyncio.create_task(telegram_bot(result))
-
             asyncio.create_task(
                 telegram_bot(
                     f"""
-                    🛒 Create an order for {symbol}  
-                    ➡️ Side: {side}  
-                    🏷️ Order Type: {side}  
-                    💰 Current Price: ${current_price}  
-                    🎯 Order Price: ${real_price}  
-                    📦 Quantity: {quantity}  
-                    📈 Profit Price: ${profit_price}  
-                    🛑 Stop Price: ${stop_price}  
+                    🛒 Create an order for {symbol}
+                    ➡️ Side: {side}
+                    🏷️ Order Type: {side}
+                    💰 Current Price: ${current_price}
+                    🎯 Order Price: ${real_price}
+                    📦 Quantity: {quantity}
+                    📈 Profit Price: ${profit_price}
+                    🛑 Stop Price: ${stop_price}
                     """
                 )
             )
@@ -240,17 +214,16 @@ class BinanceConnector:
             print(
                 f"Placing LIMIT order: {symbol} {side} qty={quantity} price={real_price}"
             )
-            limit_resp = self.client.rest_api.new_order(
+            limit_resp = self.client.new_order(
                 symbol=symbol,
                 side=side,
                 type="LIMIT",
-                price=real_price,
-                quantity=quantity,
-                time_in_force="GTC",
+                price=str(real_price),
+                quantity=str(quantity),
+                timeInForce="GTC",
             )
 
-            print(f"Placing TAKE_PROFIT_MARKET algo order: triggerPrice={tp_price}")
-            tp_resp = self._place_algo_order(
+            algo_orders = [
                 {
                     "symbol": symbol,
                     "side": close_side,
@@ -259,11 +232,8 @@ class BinanceConnector:
                     "quantity": str(quantity),
                     "reduceOnly": "true",
                     "timeInForce": "GTC",
-                }
-            )
-
-            print(f"Placing STOP_MARKET algo order: triggerPrice={sl_price}")
-            sl_resp = self._place_algo_order(
+                    "algoType": "CONDITIONAL",
+                },
                 {
                     "symbol": symbol,
                     "side": close_side,
@@ -272,31 +242,19 @@ class BinanceConnector:
                     "quantity": str(quantity),
                     "reduceOnly": "true",
                     "timeInForce": "GTC",
-                }
-            )
-
-            result = [
-                limit_resp.data().to_dict(),
-                tp_resp,
-                sl_resp,
+                    "algoType": "CONDITIONAL",
+                },
             ]
 
-            asyncio.create_task(telegram_bot(result))
+            print(f"Placing algo orders (TP + SL): {algo_orders}")
+            algo_results = [
+                self.client.sign_request("POST", "/fapi/v1/algoOrder", order)
+                for order in algo_orders
+            ]
 
-            # asyncio.create_task(
-            #     telegram_bot(
-            #         f"""
-            #         🛒 Create an order for {symbol}
-            #         ➡️ Side: {side}
-            #         🏷️ Order Type: {side}
-            #         💰 Current Price: ${current_price}
-            #         🎯 Order Price: ${real_price}
-            #         📦 Quantity: {quantity}
-            #         📈 Profit Price: ${take_profit}
-            #         🛑 Stop Price: ${stop_loss}
-            #         """
-            #     )
-            # )
+            result = [limit_resp, *algo_results]
+
+            asyncio.create_task(telegram_bot(result))
 
             return result
         except Exception as e:
@@ -311,33 +269,9 @@ class BinanceConnector:
             print(f"Error creating orders: {e}")
             return None
 
-    def _place_algo_order(self, params: dict) -> dict:
-        """Place a conditional order via POST /fapi/v1/algoOrder (Binance migration 2025-12-09)."""
-        params["algoType"] = "CONDITIONAL"
-        params["timestamp"] = int(time.time() * 1000)
-        query = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
-        sig = hmac.new(
-            BINANCE_SECRET_KEY.encode(), query.encode(), hashlib.sha256
-        ).hexdigest()
-        url = f"{BINANCE_BASE_URL}/fapi/v1/algoOrder"
-        headers = {
-            "X-MBX-APIKEY": BINANCE_API_KEY,
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-        resp = http_requests.post(
-            url, headers=headers, data=query + f"&signature={sig}"
-        )
-        data = resp.json()
-        if resp.status_code != 200:
-            raise Exception(data.get("msg", str(data)))
-        return data
-
     def set_leverage(self, symbol: str, leverage: int):
         try:
-            response = self.client.rest_api.change_initial_leverage(
-                symbol=symbol, leverage=leverage
-            )
-            data = response.data().to_dict()
+            data = self.client.change_leverage(symbol=symbol, leverage=leverage)
             print(f"Leverage set for {symbol}: {data}")
             return data
         except Exception as e:
@@ -345,9 +279,7 @@ class BinanceConnector:
             return None
 
     def get_exchange_info(self, symbol: str = None):
-
-        response = self.client.rest_api.exchange_information()
-        data = response.data().to_dict()
+        data = self.client.exchange_info()
 
         symbols = data.get("symbols", [])
 
