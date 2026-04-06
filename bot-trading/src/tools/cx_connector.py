@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from google.genai.types import Tool, FunctionDeclaration
 
-from src.binance_connector.binance import BinanceConnector
+from src.binance_connector.binance_v2 import BinanceConnector
 
 binance = ccxt.binanceusdm({})
 binance_connector = BinanceConnector()
