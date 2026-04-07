@@ -1,19 +1,19 @@
 from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
-from src.binance_connector.binance import BinanceConnector
+from connectors.binance import BinanceConnector
 
 trading = APIRouter()
 
 AI_MODELS = [
+    {"id": "claude", "label": "Claude Haiku 4.5", "model": "claude-haiku-4-5-20251001"},
+    {"id": "claude", "label": "Claude Sonnet 4.6", "model": "claude-sonnet-4-6"},
+    {"id": "claude", "label": "Claude Opus 4.6", "model": "claude-opus-4-6"},
     {"id": "gemini", "label": "Gemini 2.5 Flash", "model": "gemini-2.5-flash"},
     {"id": "gemini", "label": "Gemini 2.5 Pro", "model": "gemini-2.5-pro"},
     {"id": "gemini", "label": "Gemini 2.0 Flash", "model": "gemini-2.0-flash"},
     {"id": "gemini", "label": "Gemini 1.5 Pro", "model": "gemini-1.5-pro"},
     {"id": "gemini", "label": "Gemini 1.5 Flash", "model": "gemini-1.5-flash"},
-    {"id": "claude", "label": "Claude Opus 4.6", "model": "claude-opus-4-6"},
-    {"id": "claude", "label": "Claude Sonnet 4.6", "model": "claude-sonnet-4-6"},
-    {"id": "claude", "label": "Claude Haiku 4.5", "model": "claude-haiku-4-5-20251001"},
     {"id": "chatgpt", "label": "ChatGPT", "model": "gpt-4o"},
 ]
 
@@ -53,9 +53,21 @@ async def change_leverage_bulk(request: BulkLeverageRequest):
         try:
             data = connector.set_leverage(symbol, request.leverage)
             if data is None:
-                results.append({"symbol": symbol, "success": False, "message": "Failed to set leverage"})
+                results.append(
+                    {
+                        "symbol": symbol,
+                        "success": False,
+                        "message": "Failed to set leverage",
+                    }
+                )
             else:
-                results.append({"symbol": symbol, "success": True, "leverage": data.get("leverage", request.leverage)})
+                results.append(
+                    {
+                        "symbol": symbol,
+                        "success": True,
+                        "leverage": data.get("leverage", request.leverage),
+                    }
+                )
         except Exception as e:
             results.append({"symbol": symbol, "success": False, "message": str(e)})
     return {"results": results}

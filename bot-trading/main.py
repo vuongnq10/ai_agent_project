@@ -4,8 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
-from stream.api import stream
-from trading import api as trading_api
+from routers.stream import stream
+from routers.trading import trading
 
 app = FastAPI(title="Trading Bot API")
 app.add_middleware(
@@ -17,7 +17,7 @@ app.add_middleware(
 )
 
 app.include_router(stream, tags=["Stream"])
-app.include_router(trading_api.trading, prefix="/trading", tags=["Trading"])
+app.include_router(trading, prefix="/trading", tags=["Trading"])
 
 if __name__ == "__main__":
     # Read env vars with fallback defaults

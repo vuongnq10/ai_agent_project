@@ -2,7 +2,7 @@
 # Uses binance-connector-python (UMFutures) instead of binance_sdk_derivatives_trading_usds_futures
 import asyncio
 
-from src.telegram.telegram import telegram_bot
+from connectors.telegram import telegram_bot
 from binance.um_futures import UMFutures
 import config
 

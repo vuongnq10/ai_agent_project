@@ -5,8 +5,8 @@ from typing_extensions import TypedDict
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END
 
-from claude.agent import Agent
-from src.tools.cx_connector import CXConnector
+from agents.claude.agent import Agent
+from tools.cx_connector import CXConnector
 
 # ---------------------------------------------------------------------------
 # Module-level singletons

@@ -8,7 +8,7 @@ import hmac
 import hashlib
 import requests as http_requests
 
-from src.telegram.telegram import telegram_bot
+from connectors.telegram import telegram_bot
 
 from binance_common.configuration import ConfigurationRestAPI
 from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futures import (
@@ -170,14 +170,14 @@ class BinanceConnector:
             asyncio.create_task(
                 telegram_bot(
                     f"""
-                    🛒 Create an order for {symbol}  
-                    ➡️ Side: {side}  
-                    🏷️ Order Type: {side}  
-                    💰 Current Price: ${current_price}  
-                    🎯 Order Price: ${real_price}  
-                    📦 Quantity: {quantity}  
-                    📈 Profit Price: ${profit_price}  
-                    🛑 Stop Price: ${stop_price}  
+                    🛒 Create an order for {symbol}
+                    ➡️ Side: {side}
+                    🏷️ Order Type: {side}
+                    💰 Current Price: ${current_price}
+                    🎯 Order Price: ${real_price}
+                    📦 Quantity: {quantity}
+                    📈 Profit Price: ${profit_price}
+                    🛑 Stop Price: ${stop_price}
                     """
                 )
             )
@@ -282,21 +282,6 @@ class BinanceConnector:
             ]
 
             asyncio.create_task(telegram_bot(result))
-
-            # asyncio.create_task(
-            #     telegram_bot(
-            #         f"""
-            #         🛒 Create an order for {symbol}
-            #         ➡️ Side: {side}
-            #         🏷️ Order Type: {side}
-            #         💰 Current Price: ${current_price}
-            #         🎯 Order Price: ${real_price}
-            #         📦 Quantity: {quantity}
-            #         📈 Profit Price: ${take_profit}
-            #         🛑 Stop Price: ${stop_loss}
-            #         """
-            #     )
-            # )
 
             return result
         except Exception as e:

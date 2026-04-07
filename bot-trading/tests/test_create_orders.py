@@ -6,9 +6,7 @@ import asyncio
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# from src.binance_connector.binance import BinanceConnector
-
-from src.binance_connector.binance_v2 import BinanceConnector
+from connectors.binance_v2 import BinanceConnector
 
 # Constant test inputs
 SYMBOL = "TIAUSDT"
