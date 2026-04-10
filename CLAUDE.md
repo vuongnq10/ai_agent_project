@@ -19,15 +19,17 @@ fe_chat (React SSE client)
     ▼
 bot-trading/main.py  (FastAPI, port 8000)
     │
-    ├── /gemini/stream  ──►  MasterGemini (LangGraph)
-    │                            ├── master_agent      (routes requests)
-    │                            ├── tools_agent       (fetches market data, places orders)
-    │                            ├── analysis_agent    (SMC technical analysis)
-    │                            ├── decision_agent    (buy/sell/wait decisions)
-    │                            └── generate_response (final output)
+    ├── /{provider}/{model}/stream  ──►  MasterGemini | MasterClaude | MasterChatGPT (LangGraph)
+    │                                        ├── master_agent      (routes requests)
+    │                                        ├── tools_agent       (fetches market data, places orders)
+    │                                        ├── analysis_agent    (SMC technical analysis)
+    │                                        ├── decision_agent    (buy/sell/wait decisions)
+    │                                        └── generate_response (final output)
     │
-    └── /openai/stream  ──►  MasterOpenAI (same structure, OpenAI GPT-4o-mini)
+    └── /trading/...  ──►  models list, leverage management
 ```
+
+Supported providers: `gemini`, `claude`, `chatgpt`
 
 ### LangGraph Agent Flow
 
@@ -54,26 +56,27 @@ ai_agent_project/
 │   ├── requirements.txt               # Python dependencies
 │   ├── .env                           # Secrets (never commit)
 │   ├── .python-version                # Python version pin
-│   ├── gemini/
-│   │   ├── api.py                     # FastAPI router: GET /gemini/stream
-│   │   └── agents_gemini/
-│   │       ├── agent.py               # Base Gemini agent (gemini-2.5-flash)
-│   │       └── agentic_agent.py       # MasterGemini LangGraph orchestrator
-│   ├── open-ai/
-│   │   ├── api.py                     # FastAPI router: GET /openai/stream
-│   │   ├── agents_openai/
-│   │   │   ├── agent.py               # Base OpenAI agent (gpt-4o-mini)
-│   │   │   └── agentic_agent.py       # MasterOpenAI LangGraph orchestrator
-│   │   ├── tools/
-│   │   │   └── openai_tools.py        # OpenAI tool definitions
-│   │   └── test_agent.py              # Test script
-│   └── src/
-│       ├── binance_connector/
-│       │   └── binance.py             # BinanceConnector (USDS Futures, 20x leverage)
-│       ├── telegram/
-│       │   └── telegram.py            # Telegram notification bot
-│       └── tools/
-│           └── cx_connector.py        # CXConnector: smc_analysis + create_order tools
+│   ├── agents/
+│   │   ├── gemini/
+│   │   │   ├── agent.py               # Base Gemini agent (gemini-2.5-flash)
+│   │   │   └── agentic_agent.py       # MasterGemini LangGraph orchestrator
+│   │   ├── claude/
+│   │   │   ├── agent.py               # Base Claude agent (claude-sonnet-4-6)
+│   │   │   └── agentic_agent.py       # MasterClaude LangGraph orchestrator
+│   │   └── chat_gpt/
+│   │       ├── agent.py               # Base ChatGPT agent (gpt-4o)
+│   │       └── agentic_agent.py       # MasterChatGPT LangGraph orchestrator
+│   ├── connectors/
+│   │   ├── binance.py                 # BinanceConnector (USDS Futures, 20x leverage)
+│   │   ├── binance_v2.py              # BinanceConnector v2
+│   │   └── telegram.py               # Telegram notification bot
+│   ├── routers/
+│   │   ├── stream.py                  # APIRouter: GET /{provider}/{model}/stream (SSE)
+│   │   └── trading.py                 # APIRouter: /trading/models, /trading/leverage
+│   ├── tests/
+│   │   └── test_create_orders.py
+│   └── tools/
+│       └── cx_connector.py            # CXConnector: smc_analysis + create_order tools
 └── fe_chat/
     ├── src/
     │   ├── AppStream.tsx              # Main chat UI (SSE streaming)
@@ -137,10 +140,14 @@ APP_PORT=8000
 
 ## API Endpoints
 
-| Method | Path                       | Description                              |
-| ------ | -------------------------- | ---------------------------------------- |
-| GET    | `/gemini/stream?query=...` | SSE stream — Gemini multi-agent response |
-| GET    | `/openai/stream?query=...` | SSE stream — OpenAI multi-agent response |
+| Method | Path                                    | Description                                      |
+| ------ | --------------------------------------- | ------------------------------------------------ |
+| GET    | `/{provider}/{model}/stream?query=...`  | SSE stream — multi-agent response                |
+| GET    | `/trading/models`                       | List available AI models                         |
+| POST   | `/trading/leverage`                     | Set leverage for a symbol                        |
+| POST   | `/trading/leverage/bulk`                | Set leverage for multiple symbols                |
+
+`provider` is one of: `gemini`, `claude`, `chatgpt`. `model` is the provider-specific model name (e.g. `gemini-2.5-flash`, `claude-sonnet-4-6`, `gpt-4o`).
 
 Responses are **Server-Sent Events** streaming character by character. The stream ends with `event: end`.
 
@@ -148,7 +155,7 @@ Responses are **Server-Sent Events** streaming character by character. The strea
 
 ## Key Components
 
-### CXConnector (`src/tools/cx_connector.py`)
+### CXConnector (`tools/cx_connector.py`)
 
 The tool layer exposed to AI agents:
 
@@ -164,7 +171,7 @@ The tool layer exposed to AI agents:
 
 - **`create_order(symbol, side, entry, stop_loss, take_profit)`** — Places a 3-order bracket on Binance Futures (LIMIT entry + TAKE_PROFIT_MARKET + STOP_MARKET). Uses 20x leverage.
 
-### BinanceConnector (`src/binance_connector/binance.py`)
+### BinanceConnector (`connectors/binance.py`)
 
 Wraps `binance_sdk_derivatives_trading_usds_futures`. Trade defaults:
 
@@ -173,7 +180,7 @@ Wraps `binance_sdk_derivatives_trading_usds_futures`. Trade defaults:
 - Take profit: **0.40%** (leveraged)
 - Stop loss: **0.75%** (leveraged)
 
-### Telegram (`src/telegram/telegram.py`)
+### Telegram (`connectors/telegram.py`)
 
 Sends async notifications on order placement and errors using `aiohttp`.
 
@@ -199,5 +206,5 @@ Sends async notifications on order placement and errors using `aiohttp`.
 - The Gemini agent uses `gemini-2.5-flash` with `ThinkingConfig(include_thoughts=True)` — thinking steps are surfaced as `user_feedback` in the stream.
 - Agents communicate via a `MasterState` TypedDict (LangGraph state): `chat_history`, `agent_response`, `user_prompt`, `step_count`, `max_steps`, `user_feedback`.
 - `InMemorySaver` provides session-level conversation persistence keyed by `thread_id`.
-- The frontend connects to `http://127.0.0.1:8000/gemini/stream` by default (hardcoded in `AppStream.tsx`).
-- The `open-ai/` directory uses dashes in the folder name — use `import` carefully (it has `__init__.py` files).
+- The frontend connects via the unified `/{provider}/{model}/stream` endpoint.
+- All agents (Gemini, Claude, ChatGPT) are registered in `routers/stream.py` via a lazy-loaded registry.

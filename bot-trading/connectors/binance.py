@@ -71,8 +71,6 @@ class BinanceConnector:
         side: str,
         order_price: float,
         current_price: float,
-        take_profit: float,
-        stop_loss: float,
     ):
         if (side == "BUY" and order_price > current_price) or (
             side == "SELL" and order_price < current_price

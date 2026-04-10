@@ -10,7 +10,7 @@ BINANCE_API_KEY = config.BINANCE_API_KEY
 BINANCE_SECRET_KEY = config.BINANCE_SECRET_KEY
 BINANCE_BASE_URL = config.BINANCE_BASE_URL
 
-LEVERAGE = 10
+LEVERAGE = 15
 ORDER_AMOUNT = 10
 EXPECTED_PROFIT = 0.40
 EXPECTED_STOP_LOSS = 0.30
@@ -52,8 +52,6 @@ class BinanceConnector:
         side: str,
         order_price: float,
         current_price: float,
-        take_profit: float,
-        stop_loss: float,
     ):
         if (side == "BUY" and order_price > current_price) or (
             side == "SELL" and order_price < current_price

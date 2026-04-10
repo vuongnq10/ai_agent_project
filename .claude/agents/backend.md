@@ -1,6 +1,6 @@
 ---
 name: backend
-description: Backend agent for the bot-trading Python FastAPI project. Use for anything related to the Python backend — FastAPI routes, LangGraph agents (Gemini/OpenAI), CXConnector tools (smc_analysis, create_order), BinanceConnector, Telegram notifications, config, and dependencies.
+description: Backend agent for the bot-trading Python FastAPI project. Use for anything related to the Python backend — FastAPI routes, LangGraph agents (Gemini/Claude/ChatGPT), CXConnector tools (smc_analysis, create_order), BinanceConnector, Telegram notifications, config, and dependencies.
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
@@ -21,7 +21,8 @@ You are the **backend agent** for this AI trading bot. You work exclusively in t
 - **FastAPI** + **uvicorn** — web framework, SSE streaming
 - **LangGraph** + **LangChain** — multi-agent orchestration
 - **Google GenAI** (`google-genai`) — Gemini 2.5 Flash model
-- **OpenAI** SDK — GPT-4o-mini model
+- **Anthropic** SDK — Claude models (Haiku 4.5, Sonnet 4.6, Opus 4.6)
+- **OpenAI** SDK — GPT-4o model
 - **ccxt** — market data from Binance USDS Futures
 - **binance-sdk-derivatives-trading-usds-futures** — order placement
 - **pandas**, **numpy** — technical indicator calculation
@@ -35,26 +36,27 @@ bot-trading/
 ├── config.py                      # Load and expose env vars
 ├── requirements.txt
 ├── .env                           # Secrets — never commit
-├── gemini/
-│   ├── api.py                     # APIRouter: GET /gemini/stream (SSE)
-│   └── agents_gemini/
-│       ├── agent.py               # Base Agent: calls gemini-2.5-flash
-│       └── agentic_agent.py       # MasterGemini: LangGraph orchestrator
-├── open-ai/
-│   ├── api.py                     # APIRouter: GET /openai/stream (SSE)
-│   ├── agents_openai/
-│   │   ├── agent.py               # Base OpenAI agent (gpt-4o-mini)
-│   │   └── agentic_agent.py       # MasterOpenAI: LangGraph orchestrator
-│   ├── tools/
-│   │   └── openai_tools.py        # OpenAI function definitions
-│   └── test_agent.py
-└── src/
-    ├── binance_connector/
-    │   └── binance.py             # BinanceConnector — place bracket orders
-    ├── telegram/
-    │   └── telegram.py            # Async Telegram notifications
-    └── tools/
-        └── cx_connector.py        # CXConnector — smc_analysis + create_order
+├── agents/
+│   ├── gemini/
+│   │   ├── agent.py               # Base Gemini agent (gemini-2.5-flash)
+│   │   └── agentic_agent.py       # MasterGemini: LangGraph orchestrator
+│   ├── claude/
+│   │   ├── agent.py               # Base Claude agent (claude-sonnet-4-6)
+│   │   └── agentic_agent.py       # MasterClaude: LangGraph orchestrator
+│   └── chat_gpt/
+│       ├── agent.py               # Base ChatGPT agent (gpt-4o)
+│       └── agentic_agent.py       # MasterChatGPT: LangGraph orchestrator
+├── connectors/
+│   ├── binance.py                 # BinanceConnector — place bracket orders
+│   ├── binance_v2.py              # BinanceConnector v2
+│   └── telegram.py               # Async Telegram notifications
+├── routers/
+│   ├── stream.py                  # APIRouter: GET /{provider}/{model}/stream (SSE)
+│   └── trading.py                 # APIRouter: /trading/models, /trading/leverage
+├── tests/
+│   └── test_create_orders.py
+└── tools/
+    └── cx_connector.py            # CXConnector — smc_analysis + create_order
 ```
 
 ## Running
@@ -105,7 +107,7 @@ Each agent returns `{ "type": "CATEGORY" }`:
 
 ## SSE Streaming
 
-`GET /gemini/stream?query=...` yields:
+`GET /{provider}/{model}/stream?query=...` yields:
 
 - `data: {"character": "x"}` — one char at a time (5ms delay)
 - `event: end\ndata: Stream finished ✅` — stream complete
@@ -128,5 +130,5 @@ Places a 3-order bracket on Binance USDS Futures: LIMIT entry + TAKE_PROFIT_MARK
 - Always import env vars from `config.py`, never use `os.getenv` directly elsewhere
 - Add new routers to `main.py` via `app.include_router(...)`
 - Telegram notifications use `asyncio.create_task(...)` — non-blocking
-- The `open-ai/` folder uses dashes; `__init__.py` files make it importable
+- New agents are registered in `routers/stream.py` inside `_build_registry()`
 - Keep `requirements.txt` updated when adding dependencies

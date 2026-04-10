@@ -96,7 +96,6 @@ class Agent:
     def __call__(
         self,
         prompt: Union[str, list],
-        tools: list | None = None,
         system: str | None = None,
         model: str | None = None,
         allowed_tools: list | None = None,
@@ -107,7 +106,6 @@ class Agent:
         Args:
             prompt:        The user prompt / question to send, either as a plain
                            string or as a list of message dicts (chat history).
-            tools:         (unused) kept for API compatibility.
             system:        Optional system prompt — passed via ClaudeAgentOptions
                            so it overrides CLAUDE.md project context.
             model:         Model ID to use (defaults to CLAUDE_MODEL).
