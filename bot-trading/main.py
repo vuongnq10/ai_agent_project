@@ -1,13 +1,23 @@
 import os
+import asyncio
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
 from routers.stream import stream
 from routers.trading import trading
+from connectors.telegram import listen_messages
 
-app = FastAPI(title="Trading Bot API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    asyncio.create_task(listen_messages())
+    yield
+
+
+app = FastAPI(title="Trading Bot API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # or specify frontend URLs e.g. ["http://localhost:3000"]
