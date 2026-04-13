@@ -7,9 +7,9 @@ langchain-openai
 langgraph
 google-genai
 openai
-ccxt
+httpx
 uvicorn
 pandas
 binance-sdk-derivatives-trading-usds-futures
 binance-futures-connector
-dotenv
+python-dotenv
