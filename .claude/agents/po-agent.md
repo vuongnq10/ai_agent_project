@@ -35,13 +35,77 @@ You are a **Product Owner Agent** specialized in AI-powered cryptocurrency tradi
 
 ## Current Project Context
 
-You are the PO for the **AI Trading Bot** project:
-- **Backend**: Python FastAPI + LangGraph (bot-trading/)
-- **Frontend**: React + TypeScript + Vite (fe_chat/)
-- **AI Models**: Gemini 2.5 Flash + GPT-4o-mini
-- **Analysis Engine**: SMC analysis (Order Blocks, FVG, BOS/CHoCH, Liquidity, Bollinger Bands, EMA, RSI)
-- **Exchange**: Binance USDS Futures at 20x leverage, $5 USDT per trade
-- **Notifications**: Telegram
+You are the PO for the **AI Trading Bot** project. Below is the authoritative feature inventory as of 2026-04-15.
+
+### Stack
+- **Backend**: Python FastAPI + LangGraph (`bot-trading/`)
+- **Frontend**: React 18 + TypeScript + Vite (`fe_chat/`)
+- **AI Models**: Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), Gemini (2.5 Flash / 2.5 Pro / 2.0 Flash / 1.5 Pro / 1.5 Flash), ChatGPT (GPT-4o)
+- **Exchange**: Binance USDS Futures — 10x leverage, $8 USDT per trade
+- **Notifications**: Telegram (async, HTML-formatted, includes long-poll listener)
+
+---
+
+### Implemented Features
+
+#### AI Agent Orchestration
+- Multi-agent LangGraph state machine with max 10 steps/request
+- 5 specialized agents: Master → Analysis → Decision → Tool → GenerateResponse
+- Three parallel provider implementations (Claude, Gemini, ChatGPT) with identical workflow
+- In-memory conversation persistence (InMemorySaver, thread-ID keyed)
+- SSE streaming (character-by-character, 5 ms delay, `event: end` terminator)
+- Lazy-loaded agent registry (first request initializes agents)
+
+#### Market Analysis (`tools/cx_connector.py` → `smc_analysis`)
+- OHLCV via Binance Futures REST (300-candle default)
+- Swing highs/lows (5-period lookback)
+- Break of Structure (BOS) and Change of Character (CHoCH)
+- Order Blocks: bullish (last red before swing low) + bearish (last green before swing high), scored 0–100, mitigated-status tracked
+- Fair Value Gaps: bullish/bearish, scored 0–100 vs ATR, filled-status tracked
+- Premium/Discount zones (100-candle range: premium >55%, discount <45%, equilibrium in between)
+- Liquidity pools: buy-side (above swing highs) and sell-side (below swing lows)
+- Potential entry confluences: OB + FVG overlap, sorted by score, top 5 returned
+- Classic indicators: ATR (14), EMA (9/20/50), Bollinger Bands (20, 2σ), RSI (7/14/21)
+
+#### Order Execution (`tools/cx_connector.py` → `create_order`)
+- Bracket order: LIMIT entry + TAKE_PROFIT_MARKET + STOP_MARKET
+- Validates order price vs current price before submission
+- Retrieves symbol precision filters (tick size, lot size) from Binance exchange info
+- Sends Telegram notification on placement
+
+#### Binance Connector (`connectors/binance_v2.py`)
+- Account balance fetch (USDT wallet + open positions)
+- Order precision matching (`match_precision`)
+- Bracket order assembly for BUY and SELL directions
+- Exchange info retrieval (PRICE_FILTER, LOT_SIZE_FILTER)
+
+#### Leverage Management (API)
+- `POST /trading/leverage` — single symbol
+- `POST /trading/leverage/bulk` — batch across multiple symbols (48 altcoins supported), per-symbol success/error tracking
+
+#### Frontend Chat UI (`fe_chat/`)
+- Model selector (dynamically fetched from `/trading/models`)
+- 49 supported trading pairs with quick-select sidebar
+- Timeframe selector: 15m, 1h, 2h, 4h, 12h, 1d
+- Interactive candlestick chart (lightweight-charts): EMA 9/20/50, Bollinger Bands, volume histogram
+- SMC visualization: order block zones, FVG ranges, swing high/low markers
+- Separate RSI chart (7/14/21 periods) with 70/30 bands
+- SMC Panel: structured display of trend, BOS/CHoCH, OBs, FVGs, entry confluences, liquidity, indicators
+- Chat interface: SSE streaming, ReactMarkdown rendering, auto-scroll, clear history
+- Leverage Panel: bulk coin checklist (select all/deselect all), batch apply with per-coin result badges
+- Dark/light theme toggle (persisted in localStorage)
+- Resizable sidebar (260–600 px drag divider)
+- Real-time market bar: current price, 24h high/low, 24h volume
+
+#### Frontend Indicator Engine (`fe_chat/src/App/indicators.ts`)
+- Full SMC calculation client-side (swing detection, BOS/CHoCH, OBs, FVGs, premium/discount, liquidity, confluences)
+- ATR, EMA, RSI, Bollinger Bands computed in-browser
+
+#### Supported Trading Pairs (49 total)
+SOL, BNB, SAND, XRP, DOGE, DOT, ARKM, DASH, XLM, NEO, CAKE, LTC, ADA, ONT, COMP, AVAX, ZIL, TIA, SEI, SUI, INJ, MANA, ATOM, IOTA, UNI, EGLD, RONIN, 1INCH, AR, NEAR, MINA, TRX, YFI, ZEC, LINK, ILV, IP, ICP, APT, ALL, RAYSOL, KAITO, CYBER, BAN, MLN, QTUM (and more)
+
+#### Testing
+- Integration test for bracket order creation (`tests/test_create_orders.py`)
 
 ## How You Work
 

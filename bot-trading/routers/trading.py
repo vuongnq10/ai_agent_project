@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
-from connectors.binance import BinanceConnector
+from connectors.binance_v2 import BinanceConnector
 
 trading = APIRouter()
 

@@ -18,7 +18,7 @@ import config
 
 BINANCE_API_KEY = config.BINANCE_API_KEY
 BINANCE_SECRET_KEY = config.BINANCE_SECRET_KEY
-BINANCE_BASE_URL = config.BINANCE_BASE_URL
+BINANCE_BASE_URL = config.BINANCE_BASE_URL or "https://fapi.binance.com"
 
 configuration = ConfigurationRestAPI(
     api_key=BINANCE_API_KEY,
