@@ -17,7 +17,7 @@ export default function Input({ message, loading, selectedCoin, onChange, onSubm
     setFetching(true);
     try {
       const query = await buildSmcQuery(selectedCoin, message);
-      const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+      const fakeEvent = { preventDefault: () => { } } as React.FormEvent;
       onSubmit(fakeEvent, query);
       onChange("");
     } finally {
@@ -53,8 +53,8 @@ export default function Input({ message, loading, selectedCoin, onChange, onSubm
             disabled={busy || !message.trim()}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <line x1="22" y1="2" x2="11" y2="13" stroke="currentColor" strokeWidth="2"/>
-              <polygon points="22,2 15,22 11,13 2,9 22,2"/>
+              <line x1="22" y1="2" x2="11" y2="13" stroke="currentColor" strokeWidth="2" />
+              <polygon points="22,2 15,22 11,13 2,9 22,2" />
             </svg>
           </button>
         </div>

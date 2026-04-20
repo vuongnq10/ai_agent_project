@@ -1,12 +1,12 @@
-import { BOT_BASE_URL } from "./config";
+import { BOT_BASE_URL } from './config';
 
 export async function setLeverage(
   symbol: string,
-  leverage: number
+  leverage: number,
 ): Promise<{ success: boolean; message?: string }> {
   const res = await fetch(`${BOT_BASE_URL}/trading/leverage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ symbol, leverage }),
   });
   return res.json();
@@ -21,11 +21,11 @@ export interface BulkLeverageResult {
 
 export async function setBulkLeverage(
   symbols: string[],
-  leverage: number
+  leverage: number,
 ): Promise<{ results: BulkLeverageResult[] }> {
   const res = await fetch(`${BOT_BASE_URL}/trading/leverage/bulk`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ symbols, leverage }),
   });
   return res.json();
@@ -33,9 +33,9 @@ export async function setBulkLeverage(
 
 // ─── SMC Analysis Types ────────────────────────────────────────────────────────
 
-export type Trend = "bullish" | "bearish" | "ranging";
-export type Direction = "bullish" | "bearish";
-export type Zone = "premium" | "discount" | "equilibrium";
+export type Trend = 'bullish' | 'bearish' | 'ranging';
+export type Direction = 'bullish' | 'bearish';
+export type Zone = 'premium' | 'discount' | 'equilibrium';
 
 export interface BosChoch {
   price: number;
@@ -63,7 +63,7 @@ export interface FairValueGap {
 export interface SwingPoint {
   index: number;
   price: number;
-  type: "high" | "low";
+  type: 'high' | 'low';
 }
 
 export interface PotentialEntry {
@@ -109,16 +109,20 @@ export interface SmcAnalysisResult {
 
 export interface SmcAnalysisResponse {
   result?: SmcAnalysisResult;
-  status?: "error";
+  status?: 'error';
   message?: string;
 }
 
 export async function smcAnalysis(
   symbol: string,
-  timeframe = "1h",
-  limit = 200
+  timeframe = '1h',
+  limit = 200,
 ): Promise<SmcAnalysisResponse> {
-  const params = new URLSearchParams({ symbol, timeframe, limit: String(limit) });
+  const params = new URLSearchParams({
+    symbol,
+    timeframe,
+    limit: String(limit),
+  });
   const res = await fetch(`${BOT_BASE_URL}/trading/smc?${params}`);
   return res.json();
 }
