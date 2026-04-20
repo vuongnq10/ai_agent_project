@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
-import { calcSMC } from "../../indicators";
+import { useState, useEffect } from "react";
+import { smcAnalysis } from "../../../services/tradingService";
+import { mapApiToSMC, EMPTY_SMC } from "../../../services/smcMapper";
+import type { SMCResult } from "../../indicators";
 import CandleChart from "./CandleChart";
 import IndicatorChart from "./IndicatorChart";
 import SMCPanel from "./SMCPanel";
@@ -20,7 +22,15 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, theme
   const [smcMode, setSmcMode] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(DEFAULT_ACTIVE);
   const { candles, loading } = useCandles(symbol, timeframe);
-  const smcData = useMemo(() => calcSMC(candles), [candles]);
+  const [smcData, setSmcData] = useState<SMCResult>(EMPTY_SMC);
+
+  useEffect(() => {
+    let cancelled = false;
+    smcAnalysis(symbol, timeframe).then((res) => {
+      if (!cancelled && res.result) setSmcData(mapApiToSMC(res.result));
+    });
+    return () => { cancelled = true; };
+  }, [symbol, timeframe]);
 
   const toggleIndicator = (id: IndicatorId, checked: boolean) => {
     setActiveIndicators((prev) => {
@@ -77,7 +87,7 @@ export default function ChartPanel({ symbol, timeframe, onTimeframeChange, theme
             </div>
           )}
           <IndicatorChart candles={candles} activeIndicators={activeIndicators} theme={theme} />
-          <SMCPanel candles={candles} />
+          <SMCPanel candles={candles} smcData={smcData} />
         </>
       )}
     </div>

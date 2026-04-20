@@ -1,7 +1,10 @@
 from typing import List
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from connectors.binance_v2 import BinanceConnector
+from services.smc_service import SmcService
+
+_smc_service = SmcService()
 
 trading = APIRouter()
 
@@ -43,6 +46,15 @@ async def change_leverage(request: LeverageRequest):
         return {"success": True, "data": result}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@trading.get("/smc")
+async def get_smc_analysis(
+    symbol: str = Query(..., description="Trading pair symbol, e.g. BTCUSDT"),
+    timeframe: str = Query("1h", description="Candle timeframe, e.g. 1h, 4h, 1d"),
+    limit: int = Query(200, ge=50, le=1000, description="Number of candles to fetch"),
+):
+    return _smc_service.smc_analysis(symbol, timeframe, limit)
 
 
 @trading.post("/leverage/bulk")

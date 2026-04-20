@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import type { Candle } from "../../types";
-import { calcSMC, calcATR, calcRSI, calcEMA, calcBB } from "../../indicators";
+import { calcATR, calcRSI, calcEMA, calcBB } from "../../indicators";
+import type { SMCResult } from "../../indicators";
 
 interface Props {
   candles: Candle[];
+  smcData: SMCResult;
 }
 
 function fmt(n: number): string {
@@ -32,8 +34,7 @@ function emaColor(ema: number, price: number): string {
   return price > ema ? "#089981" : "#f23645";
 }
 
-export default function SMCPanel({ candles }: Props) {
-  const smc = useMemo(() => calcSMC(candles), [candles]);
+export default function SMCPanel({ candles, smcData }: Props) {
   const closes = useMemo(() => candles.map((c) => c.close), [candles]);
 
   const atr = useMemo(() => calcATR(candles, 14), [candles]);
@@ -60,27 +61,27 @@ export default function SMCPanel({ candles }: Props) {
   const currentPrice = candles[candles.length - 1]?.close ?? 0;
 
   const trendColor =
-    smc.trend === "bullish" ? "#089981" : smc.trend === "bearish" ? "#f23645" : "#f59e0b";
+    smcData.trend === "bullish" ? "#089981" : smcData.trend === "bearish" ? "#f23645" : "#f59e0b";
   const trendArrow =
-    smc.trend === "bullish" ? "↑" : smc.trend === "bearish" ? "↓" : "→";
+    smcData.trend === "bullish" ? "↑" : smcData.trend === "bearish" ? "↓" : "→";
 
   const pdColor =
-    smc.premiumDiscountZone === "premium"
+    smcData.premiumDiscountZone === "premium"
       ? "#f23645"
-      : smc.premiumDiscountZone === "discount"
+      : smcData.premiumDiscountZone === "discount"
       ? "#089981"
       : "#f59e0b";
 
-  const activeBullOBs = smc.orderBlocks.filter((o) => o.type === "bullish" && !o.mitigated).slice(-2);
-  const activeBearOBs = smc.orderBlocks.filter((o) => o.type === "bearish" && !o.mitigated).slice(-2);
+  const activeBullOBs = smcData.orderBlocks.filter((o) => o.type === "bullish" && !o.mitigated).slice(-2);
+  const activeBearOBs = smcData.orderBlocks.filter((o) => o.type === "bearish" && !o.mitigated).slice(-2);
 
-  const topEntries = smc.potentialEntries.slice(0, 3);
+  const topEntries = smcData.potentialEntries.slice(0, 3);
 
-  const bullFVGs = smc.fairValueGaps.filter((f) => f.type === "bullish").slice(-2);
-  const bearFVGs = smc.fairValueGaps.filter((f) => f.type === "bearish").slice(-2);
+  const bullFVGs = smcData.fairValueGaps.filter((f) => f.type === "bullish").slice(-2);
+  const bearFVGs = smcData.fairValueGaps.filter((f) => f.type === "bearish").slice(-2);
 
-  const bslAbove = smc.buySideLiquidity.filter((p) => p > currentPrice).slice(0, 3);
-  const sslBelow = smc.sellSideLiquidity.filter((p) => p < currentPrice).slice(0, 3);
+  const bslAbove = smcData.buySideLiquidity.filter((p) => p > currentPrice).slice(0, 3);
+  const sslBelow = smcData.sellSideLiquidity.filter((p) => p < currentPrice).slice(0, 3);
 
   const bbPctB =
     bb.upper != null && bb.lower != null && bb.upper !== bb.lower
@@ -99,22 +100,22 @@ export default function SMCPanel({ candles }: Props) {
         <div className="smc-stat-row">
           <span className="smc-stat-label">Trend</span>
           <span className="smc-strip-badge" style={{ color: trendColor, background: `${trendColor}18` }}>
-            {trendArrow} {smc.trend.toUpperCase()}
+            {trendArrow} {smcData.trend.toUpperCase()}
           </span>
         </div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">BOS</span>
-          {smc.lastBOS ? (
-            <span className="smc-stat-val" style={{ color: smc.lastBOS.direction === "bullish" ? "#089981" : "#f23645" }}>
-              {smc.lastBOS.direction === "bullish" ? "↑" : "↓"} {fmt(smc.lastBOS.price)}
+          {smcData.lastBOS ? (
+            <span className="smc-stat-val" style={{ color: smcData.lastBOS.direction === "bullish" ? "#089981" : "#f23645" }}>
+              {smcData.lastBOS.direction === "bullish" ? "↑" : "↓"} {fmt(smcData.lastBOS.price)}
             </span>
           ) : <span className="smc-stat-val smc-none">—</span>}
         </div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">CHoCH</span>
-          {smc.lastCHoCH ? (
-            <span className="smc-stat-val" style={{ color: smc.lastCHoCH.direction === "bullish" ? "#089981" : "#f23645" }}>
-              {smc.lastCHoCH.direction === "bullish" ? "↑" : "↓"} {fmt(smc.lastCHoCH.price)}
+          {smcData.lastCHoCH ? (
+            <span className="smc-stat-val" style={{ color: smcData.lastCHoCH.direction === "bullish" ? "#089981" : "#f23645" }}>
+              {smcData.lastCHoCH.direction === "bullish" ? "↑" : "↓"} {fmt(smcData.lastCHoCH.price)}
             </span>
           ) : <span className="smc-stat-val smc-none">—</span>}
         </div>
@@ -124,7 +125,7 @@ export default function SMCPanel({ candles }: Props) {
         </div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">Swings H/L</span>
-          <span className="smc-stat-val">{smc.swingHighs.length} / {smc.swingLows.length}</span>
+          <span className="smc-stat-val">{smcData.swingHighs.length} / {smcData.swingLows.length}</span>
         </div>
       </div>
 
@@ -245,27 +246,27 @@ export default function SMCPanel({ candles }: Props) {
         <div className="smc-stat-row">
           <span className="smc-stat-label">Zone</span>
           <span className="smc-strip-badge" style={{ color: pdColor, background: `${pdColor}18` }}>
-            {smc.premiumDiscountZone.toUpperCase()}
+            {smcData.premiumDiscountZone.toUpperCase()}
           </span>
         </div>
         <div className="smc-mini-gauge">
-          <div className="smc-mini-gauge-fill" style={{ width: `${Math.min(100, Math.max(0, smc.premiumDiscountPct))}%`, background: pdColor }} />
+          <div className="smc-mini-gauge-fill" style={{ width: `${Math.min(100, Math.max(0, smcData.premiumDiscountPct))}%`, background: pdColor }} />
         </div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">Pos</span>
-          <span className="smc-stat-val" style={{ color: pdColor }}>{smc.premiumDiscountPct.toFixed(1)}%</span>
+          <span className="smc-stat-val" style={{ color: pdColor }}>{smcData.premiumDiscountPct.toFixed(1)}%</span>
         </div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">EQ</span>
-          <span className="smc-stat-val" style={{ color: "#f59e0b" }}>{fmt(smc.equilibrium)}</span>
+          <span className="smc-stat-val" style={{ color: "#f59e0b" }}>{fmt(smcData.equilibrium)}</span>
         </div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">High</span>
-          <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(smc.rangeHigh)}</span>
+          <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(smcData.rangeHigh)}</span>
         </div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">Low</span>
-          <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(smc.rangeLow)}</span>
+          <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(smcData.rangeLow)}</span>
         </div>
       </div>
 

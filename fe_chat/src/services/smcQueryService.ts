@@ -1,7 +1,5 @@
-import { fetchCandles } from './binanceService';
-import { calcSMC, calcEMA, calcRSI, calcATR } from '../App/indicators';
-import type { SMCResult } from '../App/indicators';
-import type { Candle } from '../App/types';
+import { smcAnalysis } from './tradingService';
+import type { SmcAnalysisResult } from './tradingService';
 
 const TIMEFRAMES = [
   { label: '1h', interval: '1h' },
@@ -13,47 +11,31 @@ function fixNumber(n: number, digits = 4): string {
   return n.toFixed(digits);
 }
 
-function formatSMC(
-  symbol: string,
-  tf: string,
-  candles: Candle[],
-  smc: SMCResult,
-): string {
-  const closes = candles.map((c) => c.close);
-  const lastClose = closes[closes.length - 1];
-  const atr = calcATR(candles, 14);
-  const ema9 = calcEMA(closes, 9).at(-1) ?? null;
-  const ema20 = calcEMA(closes, 20).at(-1) ?? null;
-  const ema50 = calcEMA(closes, 50).at(-1) ?? null;
-  const rsi14 = calcRSI(closes, 14).at(-1) ?? null;
-
-  const activeOBs = smc.orderBlocks.filter((ob) => !ob.mitigated);
-  const activeFVGs = smc.fairValueGaps.filter((f) => !f.filled);
+function formatSMC(symbol: string, tf: string, data: SmcAnalysisResult): string {
+  const activeOBs = data.order_blocks.filter((ob) => !ob.mitigated);
+  const activeFVGs = data.fair_value_gaps.filter((f) => !f.filled);
 
   const lines: string[] = [
     `### ${symbol} — ${tf} Timeframe`,
-    `Current Price: ${fixNumber(lastClose)}`,
-    `Trend: ${smc.trend.toUpperCase()}`,
-    `ATR(14): ${fixNumber(atr)}`,
+    `Current Price: ${fixNumber(data.current_price)}`,
+    `Trend: ${data.trend.toUpperCase()}`,
+    `ATR(14): ${fixNumber(data.atr)}`,
     ``,
     `**Structure**`,
-    `BOS: ${smc.lastBOS ? `${smc.lastBOS.direction} at ${fixNumber(smc.lastBOS.price)}` : 'none'}`,
-    `CHoCH: ${smc.lastCHoCH ? `${smc.lastCHoCH.direction} at ${fixNumber(smc.lastCHoCH.price)}` : 'none'}`,
+    `BOS: ${data.last_bos ? `${data.last_bos.direction} at ${fixNumber(data.last_bos.price)}` : 'none'}`,
+    `CHoCH: ${data.last_choch ? `${data.last_choch.direction} at ${fixNumber(data.last_choch.price)}` : 'none'}`,
     ``,
     `**Premium / Discount**`,
-    `Range: ${fixNumber(smc.rangeLow)} – ${fixNumber(smc.rangeHigh)}`,
-    `Equilibrium: ${fixNumber(smc.equilibrium)}`,
-    `Zone: ${smc.premiumDiscountZone} (${fixNumber(smc.premiumDiscountPct, 1)}%)`,
+    `Range: ${fixNumber(data.range_low)} – ${fixNumber(data.range_high)}`,
+    `Equilibrium: ${fixNumber(data.equilibrium)}`,
+    `Zone: ${data.premium_discount_zone} (${fixNumber(data.premium_discount_pct, 1)}%)`,
     ``,
     `**Order Blocks (unmitigated, strength 0–100%)**`,
     activeOBs.length === 0
       ? 'none'
       : activeOBs
           .slice(-4)
-          .map(
-            (ob) =>
-              `  ${ob.type} OB: ${fixNumber(ob.low)} – ${fixNumber(ob.high)}  strength=${ob.strength}%`,
-          )
+          .map((ob) => `  ${ob.type} OB: ${fixNumber(ob.low)} – ${fixNumber(ob.high)}  strength=${ob.strength}%`)
           .join('\n'),
     ``,
     `**Fair Value Gaps (unfilled, strength 0–100%)**`,
@@ -61,59 +43,42 @@ function formatSMC(
       ? 'none'
       : activeFVGs
           .slice(-4)
-          .map(
-            (f) =>
-              `  ${f.type} FVG: ${fixNumber(f.low)} – ${fixNumber(f.high)}  strength=${f.strength}%`,
-          )
+          .map((f) => `  ${f.type} FVG: ${fixNumber(f.low)} – ${fixNumber(f.high)}  strength=${f.strength}%`)
           .join('\n'),
     ``,
     `**Potential Entry Zones (OB + FVG confluence)**`,
-    smc.potentialEntries.length === 0
+    data.potential_entries.length === 0
       ? 'none'
-      : smc.potentialEntries
+      : data.potential_entries
           .slice(0, 3)
-          .map(
-            (e) =>
-              `  ${e.type.toUpperCase()} zone: ${fixNumber(e.zoneLow)} – ${fixNumber(e.zoneHigh)}  confluence=${e.confluenceScore}%  OB=${e.obStrength}%  FVG=${e.fvgStrength}%  dist=${fixNumber(e.distancePct, 2)}%`,
-          )
+          .map((e) => `  ${e.type.toUpperCase()} zone: ${fixNumber(e.zone_low)} – ${fixNumber(e.zone_high)}  confluence=${e.confluence_score}%  OB=${e.ob_strength}%  FVG=${e.fvg_strength}%  dist=${fixNumber(e.distance_pct, 2)}%`)
           .join('\n'),
     ``,
     `**Liquidity**`,
-    `Buy-side (above): ${
-      smc.buySideLiquidity
-        .slice(0, 3)
-        .map((v) => fixNumber(v))
-        .join(', ') || 'none'
-    }`,
-    `Sell-side (below): ${
-      smc.sellSideLiquidity
-        .slice(0, 3)
-        .map((v) => fixNumber(v))
-        .join(', ') || 'none'
-    }`,
+    `Buy-side (above): ${data.buy_side_liquidity.slice(0, 3).map((v) => fixNumber(v)).join(', ') || 'none'}`,
+    `Sell-side (below): ${data.sell_side_liquidity.slice(0, 3).map((v) => fixNumber(v)).join(', ') || 'none'}`,
     ``,
     `**Indicators**`,
-    `EMA9: ${ema9 != null ? fixNumber(ema9) : 'n/a'}  EMA20: ${ema20 != null ? fixNumber(ema20) : 'n/a'}  EMA50: ${ema50 != null ? fixNumber(ema50) : 'n/a'}`,
-    `RSI(14): ${rsi14 != null ? fixNumber(rsi14, 1) : 'n/a'}`,
+    `EMA9: ${data.ema9 != null ? fixNumber(data.ema9) : 'n/a'}  EMA20: ${data.ema20 != null ? fixNumber(data.ema20) : 'n/a'}  EMA50: ${data.ema50 != null ? fixNumber(data.ema50) : 'n/a'}`,
+    `RSI(14): ${data.rsi14 != null ? fixNumber(data.rsi14, 1) : 'n/a'}`,
   ];
 
   return lines.join('\n');
 }
 
-export async function buildSmcQuery(
-  symbol: string,
-  userNote: string,
-): Promise<string> {
+export async function buildSmcQuery(symbol: string, userNote: string): Promise<string> {
   const results = await Promise.all(
     TIMEFRAMES.map(async ({ label, interval }) => {
-      const candles = await fetchCandles(symbol, interval);
-      const smc = calcSMC(candles);
-      return formatSMC(symbol, label, candles, smc);
+      const response = await smcAnalysis(symbol, interval);
+      if (!response.result) {
+        return `### ${symbol} — ${label} Timeframe\nError: ${response.message ?? 'Unknown error'}`;
+      }
+      return formatSMC(symbol, label, response.result);
     }),
   );
 
   const header = [
-    `The following SMC analysis was computed on the frontend for ${symbol}.`,
+    `The following SMC analysis was fetched from the backend for ${symbol}.`,
     `Analyze the multi-timeframe confluence, determine the highest-probability trade setup, then create an order if conditions are met.`,
     ``,
     `---`,
@@ -121,9 +86,7 @@ export async function buildSmcQuery(
     ...results.map((r) => r + '\n\n---'),
   ].join('\n');
 
-  const footer = userNote.trim()
-    ? `\n\nAdditional context: ${userNote.trim()}`
-    : '';
+  const footer = userNote.trim() ? `\n\nAdditional context: ${userNote.trim()}` : '';
 
   return header + footer;
 }
