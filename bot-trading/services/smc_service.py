@@ -325,6 +325,7 @@ class SmcService:
                 "swing_highs": smc["swing_highs"][-10:],
                 "swing_lows": smc["swing_lows"][-10:],
                 "potential_entries": smc["potential_entries"][:5],
+                "candles": candles[-50:],
                 **indicators,
             }
             return {"result": result}

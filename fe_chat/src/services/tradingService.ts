@@ -76,6 +76,15 @@ export interface PotentialEntry {
   distance_pct: number;
 }
 
+export interface Candle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface SmcAnalysisResult {
   symbol: string;
   timeframe: string;
@@ -105,6 +114,7 @@ export interface SmcAnalysisResult {
   rsi7: number | null;
   rsi14: number | null;
   rsi21: number | null;
+  candles: Candle[];
 }
 
 export interface SmcAnalysisResponse {

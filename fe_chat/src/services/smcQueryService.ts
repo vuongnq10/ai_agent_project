@@ -84,6 +84,11 @@ function formatSMC(
     `**Indicators**`,
     `EMA9: ${data.ema9 != null ? fixNumber(data.ema9) : 'n/a'}  EMA20: ${data.ema20 != null ? fixNumber(data.ema20) : 'n/a'}  EMA50: ${data.ema50 != null ? fixNumber(data.ema50) : 'n/a'}`,
     `RSI(14): ${data.rsi14 != null ? fixNumber(data.rsi14, 1) : 'n/a'}`,
+    ``,
+    `**Last 50 Candles**`,
+    `\`\`\`json`,
+    JSON.stringify(data.candles ?? [], null, 2),
+    `\`\`\``,
   ];
 
   return lines.join('\n');
