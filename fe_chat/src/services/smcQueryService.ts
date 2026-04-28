@@ -2,9 +2,9 @@ import { smcAnalysis } from './tradingService';
 import type { SmcAnalysisResult } from './tradingService';
 
 const TIMEFRAMES = [
-  { label: '4h', interval: '4h' },
+  { label: '8h', interval: '8h' },
   { label: '2h', interval: '2h' },
-  { label: '1h', interval: '1h' },
+  { label: '30m', interval: '30m' },
 ] as const;
 
 function fixNumber(n: number, digits = 4): string {
@@ -110,7 +110,7 @@ export async function buildSmcQuery(
 
   const header = [
     `The following SMC analysis was fetched from the backend for ${symbol}.`,
-    `Analyze the multi-timeframe confluence, determine the highest-probability trade setup, then create an order if conditions are met.`,
+    `Analyze the multi-timeframe data (8h bias → 2h setup → 30m execution), determine the highest-probability SMC trade setup at 10x leverage (target +20% account / -10% max loss, min RR 2.0), then create an order if conditions are met.`,
     ``,
     `---`,
     ``,

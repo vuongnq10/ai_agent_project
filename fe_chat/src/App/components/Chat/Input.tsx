@@ -33,9 +33,9 @@ export default function Input({ message, loading, selectedCoin, onChange, onSubm
         className="quick-smc-button"
         onClick={handleQuickSmc}
         disabled={busy}
-        title={`Fetch SMC data for ${selectedCoin} on 1h / 2h / 4h and send to AI`}
+        title={`Fetch SMC data for ${selectedCoin} on 30m / 2h / 8h and send to AI`}
       >
-        {fetching ? "Fetching SMC data…" : `⚡ Quick SMC — 1h / 2h / 4h`}
+        {fetching ? "Fetching SMC data…" : `⚡ Quick SMC — 30m / 2h / 8h`}
       </button>
       <form onSubmit={onSubmit}>
         <div className="input-wrapper">

@@ -5,9 +5,9 @@ The user message contains pre-computed SMC (Smart Money Concepts) indicators
 sent directly from the frontend — you do NOT need to fetch market data.
 
 Timeframe roles:
-- 4h → Bias timeframe: determines dominant trend direction
+- 8h → Bias timeframe: determines dominant trend direction
 - 2h → Setup timeframe: identifies the Point of Interest (OB/FVG confluence zone)
-- 1h → Execution timeframe: provides the entry trigger (CHoCH confirmation)
+- 30m → Execution timeframe: provides the entry trigger (CHoCH confirmation)
 
 Your job is to classify what the conversation needs next:
 - MARKET_ANALYSIS: Analyze the SMC indicators provided by the user.
@@ -91,9 +91,10 @@ Your role is to make the final decision: BUY, SELL, or WAIT.
   - Target next liquidity pool or key swing high/low
 
 - Risk-Reward:
-  - Risk (loss): 10-12% maximum (only if setup is strong)
-  - Reward (profit): 15-20% target
-  - Minimum RR >= 1.5
+  - Leverage: 10x
+  - Risk (loss): -10% account maximum = 1% price move (only if setup is strong)
+  - Reward (profit): +20% account target = 2% price move
+  - Minimum RR >= 2.0
 
 5. EXECUTION REQUIREMENTS
 - Every trade MUST include:
@@ -154,8 +155,8 @@ Pullback / limit-order entries (IMPORTANT):
 - Do not hesitate to route to TOOL_AGENT with a limit entry price that is
   better than the current market price when a pullback setup is evident.
   The order will sit on the book and fill if price retraces to the level.
-- Expected profit/loss ratios should still be valid based on the defined entry, stop loss, 
-  and take profit levels, even if the order is placed as a limit order. The loss around 10-12 percent acceptable if the setup is strong, but the take profit should be around 15-20 percentage.
+- Expected profit/loss ratios should still be valid based on the defined entry, stop loss,
+  and take profit levels, even if the order is placed as a limit order. At 10x leverage: max loss is -10% account (1% price move), target profit is +20% account (2% price move), minimum RR 2.0.
 
 Route your response to:
 - MARKET_ANALYSIS: If the analysis is insufficient to make a confident decision.
