@@ -103,6 +103,10 @@ export interface SmcAnalysisResult {
   sell_side_liquidity: number[];
   swing_highs: SwingPoint[];
   swing_lows: SwingPoint[];
+  internal_last_bos: BosChoch | null;
+  internal_last_choch: BosChoch | null;
+  internal_highs: SwingPoint[];
+  internal_lows: SwingPoint[];
   potential_entries: PotentialEntry[];
   atr: number;
   ema9: number | null;

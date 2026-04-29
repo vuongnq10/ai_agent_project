@@ -38,6 +38,137 @@ def _get_binance():
     return _binance
 
 
+_master_claude = None
+
+
+def _get_master_claude():
+    global _master_claude
+    if _master_claude is None:
+        from agents.claude.agentic_agent import MasterClaude
+        _master_claude = MasterClaude()
+    return _master_claude
+
+
+_AGENT_FEEDBACK_SEPARATOR = "\n *********************** \n"
+
+_STEP_LABELS = {
+    "# Master Agent": "🤖 Routing request...",
+    "# Analysis Agent": "📊 Running SMC analysis...",
+    "# Decision Agent": "⚡ Making trade decision...",
+    "# Tool Agent": "📝 Placing order on Binance...",
+}
+
+
+def _fix_num(n, digits=4):
+    try:
+        return f"{float(n):.{digits}f}"
+    except Exception:
+        return str(n)
+
+
+def _format_smc_section(symbol: str, tf: str, data: dict) -> str:
+    r = data["result"]
+    active_obs = [ob for ob in r.get("order_blocks", []) if not ob.get("mitigated")]
+    active_fvgs = [f for f in r.get("fair_value_gaps", []) if not f.get("filled")]
+
+    last_bos = r.get("last_bos")
+    bos_text = f"{last_bos['direction']} at {_fix_num(last_bos['price'])}" if last_bos else "none"
+
+    last_choch = r.get("last_choch")
+    choch_text = f"{last_choch['direction']} at {_fix_num(last_choch['price'])}" if last_choch else "none"
+
+    internal_bos = r.get("internal_last_bos")
+    internal_bos_text = f"{internal_bos['direction']} at {_fix_num(internal_bos['price'])}" if internal_bos else "none"
+
+    internal_choch = r.get("internal_last_choch")
+    internal_choch_text = f"{internal_choch['direction']} at {_fix_num(internal_choch['price'])}" if internal_choch else "none"
+
+    internal_highs = r.get("internal_highs") or []
+    internal_highs_text = ", ".join(_fix_num(p["price"]) for p in internal_highs[-3:]) or "none"
+
+    internal_lows = r.get("internal_lows") or []
+    internal_lows_text = ", ".join(_fix_num(p["price"]) for p in internal_lows[-3:]) or "none"
+
+    obs_text = "\n".join(
+        f"  {ob['type'].upper()} OB: {_fix_num(ob['low'])} – {_fix_num(ob['high'])}  strength={ob.get('strength')}"
+        for ob in active_obs[-4:]
+    ) or "none"
+
+    fvgs_text = "\n".join(
+        f"  {f['type'].upper()} FVG: {_fix_num(f['low'])} – {_fix_num(f['high'])}  strength={f.get('strength')}"
+        for f in active_fvgs[-4:]
+    ) or "none"
+
+    entries_text = "\n".join(
+        f"  {e['type'].upper()} zone: {_fix_num(e['zone_low'])} – {_fix_num(e['zone_high'])}"
+        f"  confluence={e.get('confluence_score')}  OB={e.get('ob_strength')}  FVG={e.get('fvg_strength')}  dist={_fix_num(e.get('distance_pct', 0), 2)}%"
+        for e in r.get("potential_entries", [])[:3]
+    ) or "none"
+
+    buy_liq = ", ".join(_fix_num(v) for v in r.get("buy_side_liquidity", [])[:3]) or "none"
+    sell_liq = ", ".join(_fix_num(v) for v in r.get("sell_side_liquidity", [])[:3]) or "none"
+    candles = r.get("candles", [])
+
+    lines = [
+        f"### {symbol} — {tf} Timeframe",
+        f"Current Price: {_fix_num(r.get('current_price', 0))}",
+        f"Trend: {r.get('trend', 'unknown').upper()}",
+        f"ATR(14): {_fix_num(r.get('atr', 0))}",
+        "",
+        "**Swing Structure**",
+        f"BOS:   {bos_text}",
+        f"CHoCH: {choch_text}",
+        "",
+        "**Internal Structure (size-5 pivots)**",
+        f"BOS:   {internal_bos_text}",
+        f"CHoCH: {internal_choch_text}",
+        f"Internal Highs (recent): {internal_highs_text}",
+        f"Internal Lows  (recent): {internal_lows_text}",
+        "",
+        "**Premium / Discount**",
+        f"Range:       {_fix_num(r.get('range_low', 0))} – {_fix_num(r.get('range_high', 0))}",
+        f"Equilibrium: {_fix_num(r.get('equilibrium', 0))}",
+        f"Zone:        {r.get('premium_discount_zone', 'unknown')} ({_fix_num(r.get('premium_discount_pct', 0), 1)}%)",
+        "",
+        "**Order Blocks — unmitigated (strength 0–100)**",
+        obs_text,
+        "",
+        "**Fair Value Gaps — unfilled (strength 0–100)**",
+        fvgs_text,
+        "",
+        "**Potential Entry Zones (OB + FVG confluence)**",
+        entries_text,
+        "",
+        "**Liquidity**",
+        f"Buy-side  (above): {buy_liq}",
+        f"Sell-side (below): {sell_liq}",
+        "",
+        "**Indicators**",
+        f"EMA9: {_fix_num(r.get('ema9') or 0)}  EMA20: {_fix_num(r.get('ema20') or 0)}  EMA50: {_fix_num(r.get('ema50') or 0)}",
+        f"RSI7: {_fix_num(r.get('rsi7') or 0, 1)}  RSI14: {_fix_num(r.get('rsi14') or 0, 1)}  RSI21: {_fix_num(r.get('rsi21') or 0, 1)}",
+        f"BB Upper: {_fix_num(r.get('bb_upper') or 0)}  BB Mid: {_fix_num(r.get('bb_middle') or 0)}  BB Lower: {_fix_num(r.get('bb_lower') or 0)}",
+        "",
+        "**Last 50 Candles**",
+        "```json",
+        json.dumps(candles, indent=2),
+        "```",
+    ]
+    return "\n".join(lines)
+
+
+def _build_smc_order_prompt(symbol: str, tf_results: list) -> str:
+    sections = [_format_smc_section(symbol, tf, data) + "\n\n---" for tf, data in tf_results]
+    parts = [
+        f"The following SMC analysis was fetched from the backend for {symbol}.",
+        "Analyze the multi-timeframe data (4h bias → 1h setup → 15m execution), determine the highest-probability SMC trade setup at 20x leverage (target +15–20% account / -10–12% max loss, min RR 1.5), then create an order if conditions are met.",
+        "",
+        "---",
+        "",
+        *sections,
+    ]
+    return "\n".join(parts)
+
+
 async def telegram_bot(message: str, more=None):
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -64,12 +195,13 @@ async def telegram_bot(message: str, more=None):
 
 # ─── Command Handlers ─────────────────────────────────────────────────────────
 
-async def _cmd_analyze(cmd: str, args: list):
+async def _cmd_analyze(_: str, args: list):
     try:
         if not args:
             await telegram_bot("Usage: /analyze SYMBOL [timeframe] [limit]")
             return
-        symbol = args[0].upper()
+        raw = args[0].upper()
+        symbol = raw if raw.endswith("USDT") else raw + "USDT"
         timeframe = args[1] if len(args) > 1 else "1h"
         limit = int(args[2]) if len(args) > 2 else 200
 
@@ -135,12 +267,13 @@ async def _cmd_analyze(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_price(cmd: str, args: list):
+async def _cmd_price(_: str, args: list):
     try:
         if not args:
             await telegram_bot("Usage: /price SYMBOL")
             return
-        symbol = args[0].upper()
+        raw = args[0].upper()
+        symbol = raw if raw.endswith("USDT") else raw + "USDT"
 
         loop = asyncio.get_event_loop()
         candles = await loop.run_in_executor(None, _get_fetch_candles(), symbol, "1h", 25)
@@ -155,7 +288,7 @@ async def _cmd_price(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_balance(cmd: str, args: list):
+async def _cmd_balance(*_):
     try:
         binance = _get_binance()
         loop = asyncio.get_event_loop()
@@ -165,7 +298,7 @@ async def _cmd_balance(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_positions(cmd: str, args: list):
+async def _cmd_positions(*_):
     try:
         binance = _get_binance()
         loop = asyncio.get_event_loop()
@@ -196,12 +329,13 @@ async def _cmd_positions(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_orders(cmd: str, args: list):
+async def _cmd_orders(_: str, args: list):
     try:
         if not args:
             await telegram_bot("Usage: /orders SYMBOL")
             return
-        symbol = args[0].upper()
+        raw = args[0].upper()
+        symbol = raw if raw.endswith("USDT") else raw + "USDT"
         binance = _get_binance()
         loop = asyncio.get_event_loop()
 
@@ -227,12 +361,13 @@ async def _cmd_orders(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_cancel(cmd: str, args: list):
+async def _cmd_cancel(_: str, args: list):
     try:
         if not args:
             await telegram_bot("Usage: /cancel SYMBOL")
             return
-        symbol = args[0].upper()
+        raw = args[0].upper()
+        symbol = raw if raw.endswith("USDT") else raw + "USDT"
         binance = _get_binance()
         loop = asyncio.get_event_loop()
 
@@ -269,7 +404,8 @@ async def _cmd_trade(cmd: str, args: list):
             await telegram_bot(f"Usage: {cmd} SYMBOL entry=N sl=N tp=N")
             return
 
-        symbol = args[0].upper()
+        raw = args[0].upper()
+        symbol = raw if raw.endswith("USDT") else raw + "USDT"
         kv_args = args[1:]
 
         params = {}
@@ -310,7 +446,7 @@ async def _cmd_trade(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_status(cmd: str, args: list):
+async def _cmd_status(*_):
     try:
         uptime = int(time.time() - _start_time)
         h = uptime // 3600
@@ -327,12 +463,13 @@ async def _cmd_status(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_leverage(cmd: str, args: list):
+async def _cmd_leverage(_: str, args: list):
     try:
         if len(args) < 2:
             await telegram_bot("Usage: /leverage SYMBOL N")
             return
-        symbol = args[0].upper()
+        raw = args[0].upper()
+        symbol = raw if raw.endswith("USDT") else raw + "USDT"
         leverage_str = args[1]
         try:
             leverage_int = int(leverage_str)
@@ -354,7 +491,104 @@ async def _cmd_leverage(cmd: str, args: list):
         await telegram_bot(f"Error: {e}")
 
 
-async def _cmd_help(cmd: str, args: list):
+async def _cmd_order(_: str, args: list):
+    try:
+        if not args:
+            await telegram_bot("Usage: /order SYMBOL  (e.g. /order BTCUSDT)")
+            return
+
+        raw = args[0].upper()
+        symbol = raw if raw.endswith("USDT") else raw + "USDT"
+        await telegram_bot(f"⚡ <b>Quick SMC — {symbol}</b>\nFetching 15m / 1h / 4h data...")
+
+        loop = asyncio.get_event_loop()
+        cx = _get_cx()
+
+        results_4h, results_1h, results_15m = await asyncio.gather(
+            loop.run_in_executor(None, cx.smc_analysis, symbol, "4h", 200),
+            loop.run_in_executor(None, cx.smc_analysis, symbol, "1h", 200),
+            loop.run_in_executor(None, cx.smc_analysis, symbol, "15m", 200),
+        )
+
+        for tf, data in [("4h", results_4h), ("1h", results_1h), ("15m", results_15m)]:
+            if data.get("status") == "error":
+                await telegram_bot(f"❌ Error fetching {tf} data: {data.get('message')}")
+                return
+
+        prompt = _build_smc_order_prompt(
+            symbol,
+            [("4h", results_4h), ("1h", results_1h), ("15m", results_15m)],
+        )
+        await telegram_bot("📊 Data ready. Running AI agents...")
+
+        master = _get_master_claude()
+        session_id = f"tg_order_{symbol}_{int(time.time())}"
+
+        def run_agent():
+            for chunk in master(prompt, session_id=session_id, model="claude-sonnet-4-6"):
+                clean = chunk.replace(_AGENT_FEEDBACK_SEPARATOR, "").strip()
+                if not clean:
+                    continue
+                label = None
+                for key, msg in _STEP_LABELS.items():
+                    if clean.startswith(key):
+                        label = msg
+                        break
+                if label:
+                    msg_text = label
+                else:
+                    msg_text = clean[:3500]
+                fut = asyncio.run_coroutine_threadsafe(telegram_bot(msg_text), loop)
+                fut.result(timeout=15)
+
+        await loop.run_in_executor(None, run_agent)
+
+    except Exception as e:
+        await telegram_bot(f"❌ /order error: {e}")
+
+
+async def _cmd_cancel_all(*_):
+    try:
+        binance = _get_binance()
+        loop = asyncio.get_event_loop()
+
+        orders = await loop.run_in_executor(None, binance.client.get_open_orders)
+
+        if not orders:
+            await telegram_bot("No open orders to cancel.")
+            return
+
+        symbols = list({o["symbol"] for o in orders})
+        cancelled = 0
+        errors = []
+
+        for sym in symbols:
+            try:
+                cancel_fn = getattr(binance.client, "cancel_open_orders", None)
+                if cancel_fn:
+                    await loop.run_in_executor(None, functools.partial(cancel_fn, symbol=sym))
+                else:
+                    sym_orders = [o for o in orders if o["symbol"] == sym]
+                    for o in sym_orders:
+                        await loop.run_in_executor(
+                            None,
+                            functools.partial(binance.client.cancel_order, symbol=sym, orderId=o["orderId"]),
+                        )
+                cancelled += len([o for o in orders if o["symbol"] == sym])
+            except Exception as e:
+                errors.append(f"{sym}: {e}")
+
+        lines = [f"✅ Cancelled {cancelled} order(s) across {len(symbols)} symbol(s)."]
+        if errors:
+            lines.append("⚠️ Errors:")
+            lines.extend(errors)
+        await telegram_bot("\n".join(lines))
+
+    except Exception as e:
+        await telegram_bot(f"❌ /cancel_all error: {e}")
+
+
+async def _cmd_help(*_):
     try:
         await telegram_bot(
             "<b>Available Commands</b>\n"
@@ -363,11 +597,15 @@ async def _cmd_help(cmd: str, args: list):
             "/analyze SOLUSDT 1h — SMC analysis (timeframe: 1m 5m 15m 1h 4h 1d)\n"
             "/price SOLUSDT — current price + 24h change\n"
             "\n"
+            "<b>AI Trading</b>\n"
+            "/order BTCUSDT — ⚡ Quick SMC 15m/1h/4h: AI analyses and places order if conditions met\n"
+            "\n"
             "<b>Account</b>\n"
             "/balance — USDT wallet balance\n"
             "/positions — open positions with uPnL\n"
             "/orders SOLUSDT — list open orders for symbol\n"
             "/cancel SOLUSDT — cancel all orders for symbol\n"
+            "/cancel_all — cancel ALL open orders across all symbols\n"
             "\n"
             "<b>Trading</b>\n"
             "/buy SOLUSDT entry=150 sl=148 tp=155\n"
@@ -391,8 +629,10 @@ _COMMAND_MAP = {
     "/positions": _cmd_positions,
     "/orders": _cmd_orders,
     "/cancel": _cmd_cancel,
+    "/cancel_all": _cmd_cancel_all,
     "/buy": _cmd_trade,
     "/sell": _cmd_trade,
+    "/order": _cmd_order,
     "/status": _cmd_status,
     "/leverage": _cmd_leverage,
     "/help": _cmd_help,
