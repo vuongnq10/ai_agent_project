@@ -10,6 +10,7 @@ token = config.TELEGRAM_TOKEN
 chat_id = config.TELEGRAM_CHATID
 env = config.ENV
 
+AGENT_MODEL = "claude-opus-4-6"
 _start_time = time.time()
 
 _cx = None
@@ -19,13 +20,16 @@ def _get_cx():
     global _cx
     if _cx is None:
         from tools.cx_connector import CXConnector
+
         _cx = CXConnector()
     return _cx
 
 
 def _get_fetch_candles():
     from tools.cx_connector import _fetch_candles
+
     return _fetch_candles
+
 
 _binance = None
 
@@ -34,6 +38,7 @@ def _get_binance():
     global _binance
     if _binance is None:
         from connectors.binance_v2 import BinanceConnector
+
         _binance = BinanceConnector()
     return _binance
 
@@ -45,6 +50,7 @@ def _get_master_claude():
     global _master_claude
     if _master_claude is None:
         from agents.claude.agentic_agent import MasterClaude
+
         _master_claude = MasterClaude()
     return _master_claude
 
@@ -72,42 +78,75 @@ def _format_smc_section(symbol: str, tf: str, data: dict) -> str:
     active_fvgs = [f for f in r.get("fair_value_gaps", []) if not f.get("filled")]
 
     last_bos = r.get("last_bos")
-    bos_text = f"{last_bos['direction']} at {_fix_num(last_bos['price'])}" if last_bos else "none"
+    bos_text = (
+        f"{last_bos['direction']} at {_fix_num(last_bos['price'])}"
+        if last_bos
+        else "none"
+    )
 
     last_choch = r.get("last_choch")
-    choch_text = f"{last_choch['direction']} at {_fix_num(last_choch['price'])}" if last_choch else "none"
+    choch_text = (
+        f"{last_choch['direction']} at {_fix_num(last_choch['price'])}"
+        if last_choch
+        else "none"
+    )
 
     internal_bos = r.get("internal_last_bos")
-    internal_bos_text = f"{internal_bos['direction']} at {_fix_num(internal_bos['price'])}" if internal_bos else "none"
+    internal_bos_text = (
+        f"{internal_bos['direction']} at {_fix_num(internal_bos['price'])}"
+        if internal_bos
+        else "none"
+    )
 
     internal_choch = r.get("internal_last_choch")
-    internal_choch_text = f"{internal_choch['direction']} at {_fix_num(internal_choch['price'])}" if internal_choch else "none"
+    internal_choch_text = (
+        f"{internal_choch['direction']} at {_fix_num(internal_choch['price'])}"
+        if internal_choch
+        else "none"
+    )
 
     internal_highs = r.get("internal_highs") or []
-    internal_highs_text = ", ".join(_fix_num(p["price"]) for p in internal_highs[-3:]) or "none"
+    internal_highs_text = (
+        ", ".join(_fix_num(p["price"]) for p in internal_highs[-3:]) or "none"
+    )
 
     internal_lows = r.get("internal_lows") or []
-    internal_lows_text = ", ".join(_fix_num(p["price"]) for p in internal_lows[-3:]) or "none"
+    internal_lows_text = (
+        ", ".join(_fix_num(p["price"]) for p in internal_lows[-3:]) or "none"
+    )
 
-    obs_text = "\n".join(
-        f"  {ob['type'].upper()} OB: {_fix_num(ob['low'])} – {_fix_num(ob['high'])}  strength={ob.get('strength')}"
-        for ob in active_obs[-4:]
-    ) or "none"
+    obs_text = (
+        "\n".join(
+            f"  {ob['type'].upper()} OB: {_fix_num(ob['low'])} – {_fix_num(ob['high'])}  strength={ob.get('strength')}"
+            for ob in active_obs[-4:]
+        )
+        or "none"
+    )
 
-    fvgs_text = "\n".join(
-        f"  {f['type'].upper()} FVG: {_fix_num(f['low'])} – {_fix_num(f['high'])}  strength={f.get('strength')}"
-        for f in active_fvgs[-4:]
-    ) or "none"
+    fvgs_text = (
+        "\n".join(
+            f"  {f['type'].upper()} FVG: {_fix_num(f['low'])} – {_fix_num(f['high'])}  strength={f.get('strength')}"
+            for f in active_fvgs[-4:]
+        )
+        or "none"
+    )
 
-    entries_text = "\n".join(
-        f"  {e['type'].upper()} zone: {_fix_num(e['zone_low'])} – {_fix_num(e['zone_high'])}"
-        f"  confluence={e.get('confluence_score')}  OB={e.get('ob_strength')}  FVG={e.get('fvg_strength')}  dist={_fix_num(e.get('distance_pct', 0), 2)}%"
-        for e in r.get("potential_entries", [])[:3]
-    ) or "none"
+    entries_text = (
+        "\n".join(
+            f"  {e['type'].upper()} zone: {_fix_num(e['zone_low'])} – {_fix_num(e['zone_high'])}"
+            f"  confluence={e.get('confluence_score')}  OB={e.get('ob_strength')}  FVG={e.get('fvg_strength')}  dist={_fix_num(e.get('distance_pct', 0), 2)}%"
+            for e in r.get("potential_entries", [])[:3]
+        )
+        or "none"
+    )
 
-    buy_liq = ", ".join(_fix_num(v) for v in r.get("buy_side_liquidity", [])[:3]) or "none"
-    sell_liq = ", ".join(_fix_num(v) for v in r.get("sell_side_liquidity", [])[:3]) or "none"
-    candles = r.get("candles", [])
+    buy_liq = (
+        ", ".join(_fix_num(v) for v in r.get("buy_side_liquidity", [])[:3]) or "none"
+    )
+    sell_liq = (
+        ", ".join(_fix_num(v) for v in r.get("sell_side_liquidity", [])[:3]) or "none"
+    )
+    # candles = r.get("candles", [])
 
     lines = [
         f"### {symbol} — {tf} Timeframe",
@@ -148,16 +187,18 @@ def _format_smc_section(symbol: str, tf: str, data: dict) -> str:
         f"RSI7: {_fix_num(r.get('rsi7') or 0, 1)}  RSI14: {_fix_num(r.get('rsi14') or 0, 1)}  RSI21: {_fix_num(r.get('rsi21') or 0, 1)}",
         f"BB Upper: {_fix_num(r.get('bb_upper') or 0)}  BB Mid: {_fix_num(r.get('bb_middle') or 0)}  BB Lower: {_fix_num(r.get('bb_lower') or 0)}",
         "",
-        "**Last 50 Candles**",
-        "```json",
-        json.dumps(candles, indent=2),
-        "```",
+        # "**Last 50 Candles**",
+        # "```json",
+        # json.dumps(candles, indent=2),
+        # "```",
     ]
     return "\n".join(lines)
 
 
 def _build_smc_order_prompt(symbol: str, tf_results: list) -> str:
-    sections = [_format_smc_section(symbol, tf, data) + "\n\n---" for tf, data in tf_results]
+    sections = [
+        _format_smc_section(symbol, tf, data) + "\n\n---" for tf, data in tf_results
+    ]
     parts = [
         f"The following SMC analysis was fetched from the backend for {symbol}.",
         "Analyze the multi-timeframe data (4h bias → 1h setup → 15m execution), determine the highest-probability SMC trade setup at 20x leverage (target +15–20% account / -10–12% max loss, min RR 1.5), then create an order if conditions are met.",
@@ -195,6 +236,7 @@ async def telegram_bot(message: str, more=None):
 
 # ─── Command Handlers ─────────────────────────────────────────────────────────
 
+
 async def _cmd_analyze(_: str, args: list):
     try:
         if not args:
@@ -206,7 +248,9 @@ async def _cmd_analyze(_: str, args: list):
         limit = int(args[2]) if len(args) > 2 else 200
 
         loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, _get_cx().smc_analysis, symbol, timeframe, limit)
+        data = await loop.run_in_executor(
+            None, _get_cx().smc_analysis, symbol, timeframe, limit
+        )
 
         if data.get("status") == "error":
             await telegram_bot(f"Analysis error: {data.get('message')}")
@@ -218,7 +262,9 @@ async def _cmd_analyze(_: str, args: list):
 
         last_bos = r.get("last_bos")
         if last_bos:
-            bos_text = f"{last_bos.get('direction')} @ <code>{last_bos.get('price')}</code>"
+            bos_text = (
+                f"{last_bos.get('direction')} @ <code>{last_bos.get('price')}</code>"
+            )
         else:
             bos_text = "none"
 
@@ -276,10 +322,14 @@ async def _cmd_price(_: str, args: list):
         symbol = raw if raw.endswith("USDT") else raw + "USDT"
 
         loop = asyncio.get_event_loop()
-        candles = await loop.run_in_executor(None, _get_fetch_candles(), symbol, "1h", 25)
+        candles = await loop.run_in_executor(
+            None, _get_fetch_candles(), symbol, "1h", 25
+        )
 
         current_price = candles[-1]["close"]
-        change_pct = ((candles[-1]["close"] - candles[0]["open"]) / candles[0]["open"]) * 100
+        change_pct = (
+            (candles[-1]["close"] - candles[0]["open"]) / candles[0]["open"]
+        ) * 100
         sign = "+" if change_pct >= 0 else ""
         await telegram_bot(
             f"<b>{symbol}</b>  <code>{current_price}</code>  |  24h: {sign}{change_pct:.1f}%"
@@ -354,7 +404,9 @@ async def _cmd_orders(_: str, args: list):
             otype = o.get("type", "")
             price = o.get("price", "0")
             qty = o.get("origQty", "0")
-            lines.append(f"#{oid}  {side} {otype} @ <code>{price}</code>  qty: <code>{qty}</code>")
+            lines.append(
+                f"#{oid}  {side} {otype} @ <code>{price}</code>  qty: <code>{qty}</code>"
+            )
 
         await telegram_bot("\n".join(lines))
     except Exception as e:
@@ -426,7 +478,9 @@ async def _cmd_trade(cmd: str, args: list):
             return
 
         loop = asyncio.get_event_loop()
-        candles = await loop.run_in_executor(None, _get_fetch_candles(), symbol, "1m", 1)
+        candles = await loop.run_in_executor(
+            None, _get_fetch_candles(), symbol, "1m", 1
+        )
         current_price = candles[-1]["close"]
 
         binance = _get_binance()
@@ -499,7 +553,9 @@ async def _cmd_order(_: str, args: list):
 
         raw = args[0].upper()
         symbol = raw if raw.endswith("USDT") else raw + "USDT"
-        await telegram_bot(f"⚡ <b>Quick SMC — {symbol}</b>\nFetching 15m / 1h / 4h data...")
+        await telegram_bot(
+            f"⚡ <b>Quick SMC — {symbol}</b>\nFetching 15m / 1h / 4h data..."
+        )
 
         loop = asyncio.get_event_loop()
         cx = _get_cx()
@@ -512,7 +568,9 @@ async def _cmd_order(_: str, args: list):
 
         for tf, data in [("4h", results_4h), ("1h", results_1h), ("15m", results_15m)]:
             if data.get("status") == "error":
-                await telegram_bot(f"❌ Error fetching {tf} data: {data.get('message')}")
+                await telegram_bot(
+                    f"❌ Error fetching {tf} data: {data.get('message')}"
+                )
                 return
 
         prompt = _build_smc_order_prompt(
@@ -525,7 +583,7 @@ async def _cmd_order(_: str, args: list):
         session_id = f"tg_order_{symbol}_{int(time.time())}"
 
         def run_agent():
-            for chunk in master(prompt, session_id=session_id, model="claude-sonnet-4-6"):
+            for chunk in master(prompt, session_id=session_id, model=AGENT_MODEL):
                 clean = chunk.replace(_AGENT_FEEDBACK_SEPARATOR, "").strip()
                 if not clean:
                     continue
@@ -566,13 +624,19 @@ async def _cmd_cancel_all(*_):
             try:
                 cancel_fn = getattr(binance.client, "cancel_open_orders", None)
                 if cancel_fn:
-                    await loop.run_in_executor(None, functools.partial(cancel_fn, symbol=sym))
+                    await loop.run_in_executor(
+                        None, functools.partial(cancel_fn, symbol=sym)
+                    )
                 else:
                     sym_orders = [o for o in orders if o["symbol"] == sym]
                     for o in sym_orders:
                         await loop.run_in_executor(
                             None,
-                            functools.partial(binance.client.cancel_order, symbol=sym, orderId=o["orderId"]),
+                            functools.partial(
+                                binance.client.cancel_order,
+                                symbol=sym,
+                                orderId=o["orderId"],
+                            ),
                         )
                 cancelled += len([o for o in orders if o["symbol"] == sym])
             except Exception as e:
@@ -657,6 +721,7 @@ async def _route_command(text: str):
 
 # ─── Listener ─────────────────────────────────────────────────────────────────
 
+
 async def listen_messages():
     """Long-poll Telegram for new messages and print their text.
 
@@ -674,7 +739,9 @@ async def listen_messages():
                 params["offset"] = offset
 
             try:
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=35)) as response:
+                async with session.get(
+                    url, params=params, timeout=aiohttp.ClientTimeout(total=35)
+                ) as response:
                     data = await response.json()
 
                 if not data.get("ok"):

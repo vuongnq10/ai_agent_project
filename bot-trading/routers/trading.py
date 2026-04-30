@@ -9,9 +9,9 @@ _smc_service = SmcService()
 trading = APIRouter()
 
 AI_MODELS = [
-    {"id": "claude", "label": "Claude Haiku 4.5", "model": "claude-haiku-4-5-20251001"},
-    {"id": "claude", "label": "Claude Sonnet 4.6", "model": "claude-sonnet-4-6"},
     {"id": "claude", "label": "Claude Opus 4.6", "model": "claude-opus-4-6"},
+    {"id": "claude", "label": "Claude Sonnet 4.6", "model": "claude-sonnet-4-6"},
+    {"id": "claude", "label": "Claude Haiku 4.5", "model": "claude-haiku-4-5-20251001"},
     {"id": "gemini", "label": "Gemini 2.5 Flash", "model": "gemini-2.5-flash"},
     {"id": "gemini", "label": "Gemini 2.5 Pro", "model": "gemini-2.5-pro"},
     {"id": "gemini", "label": "Gemini 2.0 Flash", "model": "gemini-2.0-flash"},

@@ -108,10 +108,10 @@ function formatSMC(
       `BB Mid: ${data.bb_middle != null ? fixNumber(data.bb_middle) : 'n/a'}  ` +
       `BB Lower: ${data.bb_lower != null ? fixNumber(data.bb_lower) : 'n/a'}`,
     ``,
-    `**Last 50 Candles**`,
-    '```json',
-    JSON.stringify(data.candles ?? [], null, 2),
-    '```',
+    // `**Last 50 Candles**`,
+    // '```json',
+    // JSON.stringify(data.candles ?? [], null, 2),
+    // '```',
   ];
 
   return lines.join('\n');

@@ -127,9 +127,9 @@ class Agent:
         # context, so the agent behaves as the trading orchestrator.
         options = ClaudeAgentOptions(
             model=model or CLAUDE_MODEL,
-            # No file-system tools — this is a pure LLM reasoning call
             allowed_tools=allowed_tools if allowed_tools is not None else [],
             system_prompt=system or None,
+            permission_mode="bypassPermissions",
         )
 
         # The SDK is async-first (anyio-backed); run it in a separate thread
