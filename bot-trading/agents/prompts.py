@@ -154,6 +154,14 @@ make a final trading decision: BUY, SELL, or WAIT.
 - Take profit: target the nearest opposing liquidity pool (buy-side for longs, sell-side for shorts).
 - At 20x leverage: max loss ~10–12% of account; target profit ~15–20%.
 
+=== STOP LOSS AND TAKE PROFIT - Side BUY ===
+- Stop loss: should be less than entry price, ideally below the 1h bullish OB low to allow for volatility.
+- Take profit: should be greater than entry price, ideally targeting the nearest sell-side liquidity pool.
+
+=== STOP LOSS AND TAKE PROFIT - Side SEL ===
+- Stop loss: should be greater than entry price, ideally above the 1h bearish OB high to allow for volatility.
+- Take profit: should be less than entry price, ideally targeting the nearest buy-side liquidity pool.
+
 === REVERSAL EXCEPTION (use sparingly) ===
 If 4h structure is strongly bearish but a fresh bullish CHoCH just fired on 4h
 AND a strong bullish confluence (score >= 14/19) exists at a major discount OB,
