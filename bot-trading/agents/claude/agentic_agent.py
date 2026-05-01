@@ -88,7 +88,6 @@ class MasterState(TypedDict):
     model: str
 
 
-
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
@@ -111,7 +110,7 @@ class MasterClaude:
 
         workflow.add_edge("init_flow", "master_agent")
 
-        # master_agent can loop back to itself for GENERAL_QUERY or on parse errors
+        # master_agent → any node
         workflow.add_conditional_edges(
             "master_agent",
             self._routing,
@@ -124,20 +123,28 @@ class MasterClaude:
             },
         )
 
-        workflow.add_edge("tools_agent", "generate_response")
+        # tools_agent → master_agent only (generate_response on max_steps)
+        workflow.add_conditional_edges(
+            "tools_agent",
+            self._route_tools,
+            {
+                "master_agent": "master_agent",
+                "generate_response": "generate_response",
+            },
+        )
 
+        # analysis_agent → decision_agent or master_agent only
         workflow.add_conditional_edges(
             "analysis_agent",
-            self._routing,
+            self._route_analysis,
             {
-                "tools_agent": "tools_agent",
-                "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",
                 "master_agent": "master_agent",
                 "generate_response": "generate_response",
             },
         )
 
+        # decision_agent → any node
         workflow.add_conditional_edges(
             "decision_agent",
             self._routing,
@@ -172,6 +179,27 @@ class MasterClaude:
 
         type_value = data.get("type", "GENERAL_QUERY")
         return _ROUTE_MAP.get(type_value, "master_agent")
+
+    def _route_tools(self, state: MasterState) -> str:
+        if state["step_count"] >= state["max_steps"]:
+            return "generate_response"
+        return "master_agent"
+
+    def _route_analysis(self, state: MasterState) -> str:
+        if state["step_count"] >= state["max_steps"]:
+            return "generate_response"
+
+        raw = state.get("agent_response") or _DEFAULT_RESPONSE
+        clean = raw.strip("`").removeprefix("json").strip()
+        try:
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            return "master_agent"
+
+        type_value = data.get("type", "GENERAL_QUERY")
+        if type_value == "TRADE_DECISION":
+            return "decision_agent"
+        return "master_agent"
 
     # ------------------------------------------------------------------
     # Helper: parse a plain string response from the Agent wrapper
@@ -209,7 +237,9 @@ class MasterClaude:
     # ------------------------------------------------------------------
     # Helper: apply parsed response fields back onto state
     # ------------------------------------------------------------------
-    def _apply_parsed_response(self, state: MasterState, parsed: dict, label: str = "") -> None:
+    def _apply_parsed_response(
+        self, state: MasterState, parsed: dict, label: str = ""
+    ) -> None:
         """Mutate state in-place with thought and agent_response from parsed.
 
         Always updates user_feedback so the streamed output shows the actual
@@ -241,9 +271,7 @@ class MasterClaude:
 
         if state["step_count"] == 0:
             # First call: initialise history with only the user's original prompt
-            state["chat_history"] = [
-                {"role": "user", "content": state["user_prompt"]}
-            ]
+            state["chat_history"] = [{"role": "user", "content": state["user_prompt"]}]
         else:
             # Re-entry: append the previous agent_response as a new user turn
             # so master_agent has full context of what happened in prior steps
@@ -251,7 +279,11 @@ class MasterClaude:
                 {"role": "user", "content": state["agent_response"]}
             )
 
-        response = agent(state["chat_history"], system=_MASTER_SYSTEM_INSTRUCTION, model=state["model"])
+        response = agent(
+            state["chat_history"],
+            system=_MASTER_SYSTEM_INSTRUCTION,
+            model=state["model"],
+        )
         print("Master Agent response:", response)
         print("*" * 20)
 
@@ -305,9 +337,11 @@ class MasterClaude:
                             }
                         )
                         # Surface tool result in stream so client sees it
-                        state["user_feedback"] = f"{label}\n\n**Tool executed:** `{tool_name}`\n\n{tool_result_str}"
-                        # After tool execution route to final response
-                        state["agent_response"] = json.dumps({"type": "FINAL_RESPONSE"})
+                        state["user_feedback"] = (
+                            f"{label}\n\n**Tool executed:** `{tool_name}`\n\n{tool_result_str}"
+                        )
+                        # Route back to master_agent so it can summarise the tool result
+                        state["agent_response"] = json.dumps({"type": "GENERAL_QUERY"})
             except (json.JSONDecodeError, Exception):
                 pass  # Not a tool call — treat as normal routing response
 
@@ -330,7 +364,9 @@ class MasterClaude:
             print("Analysis Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response), label=label)
+            self._apply_parsed_response(
+                state, self._parse_response(response), label=label
+            )
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -350,7 +386,9 @@ class MasterClaude:
             print("Decision Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response), label=label)
+            self._apply_parsed_response(
+                state, self._parse_response(response), label=label
+            )
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -387,7 +425,9 @@ class MasterClaude:
             )
             history = list(state.get("chat_history", []))
             history.append({"role": "user", "content": final_prompt})
-            final_text = agent(history, system=_FINAL_RESPONSE_SYSTEM, model=state["model"])
+            final_text = agent(
+                history, system=_FINAL_RESPONSE_SYSTEM, model=state["model"]
+            )
             state["user_feedback"] = final_text or raw
         else:
             # The last agent_response already contains the human-readable answer
@@ -398,7 +438,12 @@ class MasterClaude:
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
-    def __call__(self, prompt: str, session_id: str = "default_session", model: str = "claude-opus-4-6"):
+    def __call__(
+        self,
+        prompt: str,
+        session_id: str = "default_session",
+        model: str = "claude-opus-4-6",
+    ):
         initial_state: MasterState = {
             "agent_response": "",
             "chat_history": [],
@@ -410,7 +455,9 @@ class MasterClaude:
         }
         graph_config = {"configurable": {"thread_id": session_id}}
 
-        for event in self.graph.stream(initial_state, config=graph_config, stream_mode="values"):
+        for event in self.graph.stream(
+            initial_state, config=graph_config, stream_mode="values"
+        ):
             try:
                 print("Event:", event)
                 feedback = event.get("user_feedback")
