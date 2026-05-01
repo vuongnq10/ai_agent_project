@@ -10,6 +10,7 @@ from agents.prompts import (
     MASTER_SYSTEM_INSTRUCTION as _MASTER_SYSTEM_INSTRUCTION,
     ANALYSIS_SYSTEM_INSTRUCTION as _ANALYSIS_SYSTEM_INSTRUCTION,
     DECISION_SYSTEM_INSTRUCTION as _DECISION_SYSTEM_INSTRUCTION,
+    FINAL_RESPONSE_SYSTEM as _FINAL_RESPONSE_SYSTEM,
 )
 from tools.cx_connector import CXConnector
 
@@ -94,16 +95,7 @@ class MasterChatGPT:
             },
         )
 
-        workflow.add_conditional_edges(
-            "tools_agent",
-            self._routing,
-            {
-                "analysis_agent": "analysis_agent",
-                "decision_agent": "decision_agent",
-                "master_agent": "master_agent",
-                "generate_response": "generate_response",
-            },
-        )
+        workflow.add_edge("tools_agent", "generate_response")
 
         workflow.add_conditional_edges(
             "analysis_agent",
@@ -219,7 +211,8 @@ class MasterChatGPT:
 
     def _tool_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Tool Agent — step {state['step_count']}"
+            label = f"# Tool Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(state["chat_history"], tools=_CHATGPT_TOOLS, model=state["model"])
             print("Tool Agent response:", response)
@@ -236,11 +229,13 @@ class MasterChatGPT:
                 for tc in parsed["tool_calls"]:
                     tool_func = getattr(cx_connector, tc.function.name)
                     tool_result = tool_func(**json.loads(tc.function.arguments))
+                    tool_result_str = json.dumps(tool_result)
                     state["chat_history"].append({
                         "role": "tool",
                         "tool_call_id": tc.id,
-                        "content": json.dumps(tool_result),
+                        "content": tool_result_str,
                     })
+                    state["user_feedback"] = f"{label}\n\n**Tool executed:** `{tc.function.name}`\n\n{tool_result_str}"
 
             state["step_count"] += 1
             return state
@@ -285,7 +280,24 @@ class MasterChatGPT:
             return state
 
     def _generate_response(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = ""
+        raw = state.get("agent_response", "").strip()
+        cleaned = raw.strip("`").removeprefix("json").strip()
+        is_routing_json = False
+        try:
+            data = json.loads(cleaned)
+            if isinstance(data, dict) and "type" in data:
+                is_routing_json = True
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        if is_routing_json or not raw:
+            history = list(state.get("chat_history", []))
+            history.append({"role": "user", "content": "Based on the conversation so far, write the final answer for the user. Do not use JSON."})
+            response = agent(history, system=_FINAL_RESPONSE_SYSTEM, model=state["model"])
+            parsed = self._parse_response(response)
+            state["user_feedback"] = parsed["agent_response"] or raw
+        else:
+            state["user_feedback"] = raw
         return state
 
     def __call__(self, prompt: str, session_id: str = "default_session", model: str = "gpt-4o"):

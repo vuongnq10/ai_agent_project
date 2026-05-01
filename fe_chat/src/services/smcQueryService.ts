@@ -3,8 +3,8 @@ import type { SmcAnalysisResult } from './tradingService';
 
 const TIMEFRAMES = [
   { label: '4h', interval: '4h' },
-  { label: '1h', interval: '1h' },
-  { label: '15m', interval: '15m' },
+  { label: '2h', interval: '2h' },
+  { label: '30m', interval: '30m' },
 ] as const;
 
 function fixNumber(n: number, digits = 4): string {
@@ -132,12 +132,12 @@ export async function buildSmcQuery(
   );
 
   const header = [
-    `SMC multi-timeframe analysis for ${symbol} (4h bias → 1h setup → 15m execution).`,
+    `SMC multi-timeframe analysis for ${symbol} (4h bias → 2h setup → 30m execution).`,
     ``,
     `Apply the 3-step hierarchy:`,
     `  1. 4h BIAS — determine trend direction from trend/BOS/CHoCH/OB/zone`,
-    `  2. 1h POI  — find the highest-confluence unmitigated OB + unfilled FVG zone aligned with the 4h bias`,
-    `  3. 15m TRIGGER — confirm entry via CHoCH (or internal_last_choch) at or near the 1h POI`,
+    `  2. 2h POI  — find the highest-confluence unmitigated OB + unfilled FVG zone aligned with the 4h bias`,
+    `  3. 30m TRIGGER — confirm entry via CHoCH (or internal_last_choch) at or near the 2h POI`,
     ``,
     `Then apply the 5-gate model (Bias / Zone / POI / Trigger / R:R).`,
     `At 20x leverage: max loss ~10–12% account, target profit ~15–20%, min R:R 1.5.`,

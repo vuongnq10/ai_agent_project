@@ -124,16 +124,7 @@ class MasterClaude:
             },
         )
 
-        workflow.add_conditional_edges(
-            "tools_agent",
-            self._routing,
-            {
-                "analysis_agent": "analysis_agent",
-                "decision_agent": "decision_agent",
-                "master_agent": "master_agent",
-                "generate_response": "generate_response",
-            },
-        )
+        workflow.add_edge("tools_agent", "generate_response")
 
         workflow.add_conditional_edges(
             "analysis_agent",
