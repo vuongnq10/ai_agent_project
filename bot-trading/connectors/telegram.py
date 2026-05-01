@@ -201,7 +201,7 @@ def _build_smc_order_prompt(symbol: str, tf_results: list) -> str:
     ]
     parts = [
         f"The following SMC analysis was fetched from the backend for {symbol}.",
-        "Analyze the multi-timeframe data (4h bias → 1h setup → 15m execution), determine the highest-probability SMC trade setup at 20x leverage (target +15–20% account / -10–12% max loss, min RR 1.5), then create an order if conditions are met.",
+        "Analyze the multi-timeframe data (4h bias → 2h setup → 30m execution), determine the highest-probability SMC trade setup at 20x leverage (target +15–20% account / -10–12% max loss, min RR 1.5), then create an order if conditions are met.",
         "",
         "---",
         "",
@@ -554,19 +554,19 @@ async def _cmd_order(_: str, args: list):
         raw = args[0].upper()
         symbol = raw if raw.endswith("USDT") else raw + "USDT"
         await telegram_bot(
-            f"⚡ <b>Quick SMC — {symbol}</b>\nFetching 15m / 1h / 4h data..."
+            f"⚡ <b>Quick SMC — {symbol}</b>\nFetching 30m / 2h / 4h data..."
         )
 
         loop = asyncio.get_event_loop()
         cx = _get_cx()
 
-        results_4h, results_1h, results_15m = await asyncio.gather(
+        results_4h, results_2h, results_30m = await asyncio.gather(
             loop.run_in_executor(None, cx.smc_analysis, symbol, "4h", 200),
-            loop.run_in_executor(None, cx.smc_analysis, symbol, "1h", 200),
-            loop.run_in_executor(None, cx.smc_analysis, symbol, "15m", 200),
+            loop.run_in_executor(None, cx.smc_analysis, symbol, "2h", 200),
+            loop.run_in_executor(None, cx.smc_analysis, symbol, "30m", 200),
         )
 
-        for tf, data in [("4h", results_4h), ("1h", results_1h), ("15m", results_15m)]:
+        for tf, data in [("4h", results_4h), ("2h", results_2h), ("30m", results_30m)]:
             if data.get("status") == "error":
                 await telegram_bot(
                     f"❌ Error fetching {tf} data: {data.get('message')}"
@@ -575,7 +575,7 @@ async def _cmd_order(_: str, args: list):
 
         prompt = _build_smc_order_prompt(
             symbol,
-            [("4h", results_4h), ("1h", results_1h), ("15m", results_15m)],
+            [("4h", results_4h), ("2h", results_2h), ("30m", results_30m)],
         )
         await telegram_bot("📊 Data ready. Running AI agents...")
 
@@ -662,7 +662,7 @@ async def _cmd_help(*_):
             "/price SOLUSDT — current price + 24h change\n"
             "\n"
             "<b>AI Trading</b>\n"
-            "/order BTCUSDT — ⚡ Quick SMC 15m/1h/4h: AI analyses and places order if conditions met\n"
+            "/order BTCUSDT — ⚡ Quick SMC 30m/2h/4h: AI analyses and places order if conditions met\n"
             "\n"
             "<b>Account</b>\n"
             "/balance — USDT wallet balance\n"

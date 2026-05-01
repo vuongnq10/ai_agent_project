@@ -4,7 +4,7 @@ from typing_extensions import TypedDict
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, END
-from google.genai.types import Content, Part
+from google.genai.types import Content, Part, Tool, FunctionDeclaration
 
 from agents.gemini.agent import Agent
 from agents.prompts import (
@@ -21,6 +21,51 @@ from tools.cx_connector import CXConnector
 memory = InMemorySaver()
 agent = Agent()
 cx_connector = CXConnector()
+
+_CX_TOOLS = Tool(
+    function_declarations=[
+        FunctionDeclaration(
+            name="create_order",
+            description="Save a 20 leverage trade setup with entry, stop loss, and take profit.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "The trading pair symbol (e.g., 'SOLUSDT').",
+                    },
+                    "current_price": {
+                        "type": "number",
+                        "description": "Current market price for the symbol.",
+                    },
+                    "side": {
+                        "type": "string",
+                        "description": "Type of order (e.g., 'BUY', 'SELL').",
+                    },
+                    "entry": {
+                        "type": "number",
+                        "description": "Entry price for the trade. ",
+                    },
+                    "stop_loss": {
+                        "type": "string",
+                        "description": "Stop loss price for the trade. String representation of a float.",
+                    },
+                    "take_profit": {
+                        "type": "string",
+                        "description": "Take profit price for the trade. String representation of a float.",
+                    },
+                },
+                "required": [
+                    "symbol",
+                    "side",
+                    "entry",
+                    "take_profit",
+                    "stop_loss",
+                ],
+            },
+        ),
+    ],
+)
 
 # Separator appended after every streamed user_feedback chunk
 _FEEDBACK_SEPARATOR = "\n *********************** \n"
@@ -202,7 +247,7 @@ class MasterGemini:
             label = f"# Tool Agent — step {state['step_count']}"
             state["user_feedback"] = label
 
-            response = agent(state["chat_history"], tools=[cx_connector.tools], model=state["model"])
+            response = agent(state["chat_history"], tools=[_CX_TOOLS], model=state["model"])
             print("Tool Agent response:", response)
             print("*" * 20)
 
