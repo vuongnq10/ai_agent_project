@@ -22,7 +22,7 @@ export default function Messages({ chatHistory, loading }: ChatMessagesProps) {
       {chatHistory.length === 0 ? (
         <div className="chat-empty">
           <svg className="chat-empty-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
           <p className="chat-empty-title">AI Trading Assistant</p>
           <p className="chat-empty-sub">Ask about market conditions, get analysis, or request trade setups.</p>
@@ -35,7 +35,7 @@ export default function Messages({ chatHistory, loading }: ChatMessagesProps) {
             </div>
             <div className="message-content">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {item.content}
+                {item.content.replace(/\\n/g, '\n').replace(/\\"/g, '"')}
               </ReactMarkdown>
             </div>
           </div>

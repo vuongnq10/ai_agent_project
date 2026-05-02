@@ -58,10 +58,10 @@ def _get_master_claude():
 _AGENT_FEEDBACK_SEPARATOR = "\n *********************** \n"
 
 _STEP_LABELS = {
-    "# Master Agent": "🤖 Routing request...",
-    "# Analysis Agent": "📊 Running SMC analysis...",
-    "# Decision Agent": "⚡ Making trade decision...",
-    "# Tool Agent": "📝 Placing order on Binance...",
+    "# Master Agent": "🤖 Routing...",
+    "# Analysis Agent": "📊 Analysing confluence...",
+    "# Decision Agent": "⚡ Evaluating setup...",
+    "# Tool Agent": "📝 Submitting bracket order...",
 }
 
 
@@ -192,6 +192,32 @@ def _format_smc_section(symbol: str, tf: str, data: dict) -> str:
         # json.dumps(candles, indent=2),
         # "```",
     ]
+    return "\n".join(lines)
+
+
+def _build_smc_snapshot_msg(symbol: str, tf_results: list) -> str:
+    lines = [f"<b>📊 SMC Snapshot — {symbol}</b>"]
+    for tf, data in tf_results:
+        r = data["result"]
+        price = _fix_num(r.get("current_price", 0))
+        trend = r.get("trend", "?").upper()
+        zone = r.get("premium_discount_zone", "?")
+        zpct = _fix_num(r.get("premium_discount_pct", 0), 1)
+        rsi14 = _fix_num(r.get("rsi14") or 0, 1)
+        bos = r.get("last_bos")
+        choch = r.get("last_choch")
+        bos_txt = f"{bos['direction']} <code>{_fix_num(bos['price'])}</code>" if bos else "—"
+        choch_txt = f"{choch['direction']} <code>{_fix_num(choch['price'])}</code>" if choch else "—"
+        top_e = (r.get("potential_entries") or [{}])[0]
+        entry_txt = (
+            f"<code>{_fix_num(top_e['zone_low'])}–{_fix_num(top_e['zone_high'])}</code> sc={top_e.get('confluence_score')}"
+            if top_e.get("zone_low") else "none"
+        )
+        lines += [
+            f"\n<b>{tf}</b>  price=<code>{price}</code>  trend={trend}  rsi={rsi14}",
+            f"  BOS {bos_txt}  CHoCH {choch_txt}",
+            f"  zone={zone}({zpct}%)  entry={entry_txt}",
+        ]
     return "\n".join(lines)
 
 
@@ -566,21 +592,23 @@ async def _cmd_order(_: str, args: list):
             loop.run_in_executor(None, cx.smc_analysis, symbol, "30m", 200),
         )
 
-        for tf, data in [("4h", results_4h), ("2h", results_2h), ("30m", results_30m)]:
+        tf_results = [("4h", results_4h), ("2h", results_2h), ("30m", results_30m)]
+
+        for tf, data in tf_results:
             if data.get("status") == "error":
                 await telegram_bot(
-                    f"❌ Error fetching {tf} data: {data.get('message')}"
+                    f"<b>Fetch error [{tf}] {symbol}</b>\n<code>{data.get('message')}</code>"
                 )
                 return
 
-        prompt = _build_smc_order_prompt(
-            symbol,
-            [("4h", results_4h), ("2h", results_2h), ("30m", results_30m)],
-        )
-        await telegram_bot("📊 Data ready. Running AI agents...")
+        await telegram_bot(_build_smc_snapshot_msg(symbol, tf_results))
+
+        prompt = _build_smc_order_prompt(symbol, tf_results)
+        await telegram_bot(f"🤖 <b>AI analysis started — {symbol}</b>\nRunning multi-agent SMC pipeline...")
 
         master = _get_master_claude()
         session_id = f"tg_order_{symbol}_{int(time.time())}"
+        agent_final_response = []
 
         def run_agent():
             for chunk in master(prompt, session_id=session_id, model=AGENT_MODEL):
@@ -593,16 +621,24 @@ async def _cmd_order(_: str, args: list):
                         label = msg
                         break
                 if label:
-                    msg_text = label
+                    body = "\n".join(clean.split("\n")[1:]).strip()
+                    msg_text = f"{label}\n\n{body[:3000]}" if body else label
                 else:
                     msg_text = clean[:3500]
+                    agent_final_response[:] = [clean]
                 fut = asyncio.run_coroutine_threadsafe(telegram_bot(msg_text), loop)
                 fut.result(timeout=15)
 
         await loop.run_in_executor(None, run_agent)
 
+        if agent_final_response:
+            await telegram_bot(
+                f"<b>📋 Agent Response — {symbol}</b>\n\n{agent_final_response[0][:3500]}"
+            )
+        await telegram_bot(f"✅ <b>Analysis complete — {symbol}</b>")
+
     except Exception as e:
-        await telegram_bot(f"❌ /order error: {e}")
+        await telegram_bot(f"<b>❌ Error</b> /order {symbol if 'symbol' in dir() else ''}\n<code>{e}</code>")
 
 
 async def _cmd_cancel_all(*_):

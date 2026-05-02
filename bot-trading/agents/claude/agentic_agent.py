@@ -39,6 +39,28 @@ _DEFAULT_RESPONSE = '{"type": "GENERAL_QUERY"}'
 # Claude-format tool definitions (mirrors cx_connector.tools for Gemini)
 _CLAUDE_TOOLS = [
     {
+        "name": "smc_analysis",
+        "description": "Fetch live OHLCV candles from Binance and compute SMC indicators: ATR, swing highs/lows, order blocks, Fair Value Gaps, BOS, CHoCH, liquidity levels, Bollinger Bands, EMA, and RSI.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "symbol": {
+                    "type": "string",
+                    "description": "Trading pair symbol (e.g., 'SOLUSDT', 'BTCUSDT').",
+                },
+                "timeframe": {
+                    "type": "string",
+                    "description": "Candle timeframe (e.g., '30m', '1h', '4h'). Defaults to '1h'.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of candles to fetch. Defaults to 200.",
+                },
+            },
+            "required": ["symbol"],
+        },
+    },
+    {
         "name": "create_order",
         "description": "Save a 20x leverage trade setup with entry, stop loss, and take profit on Binance Futures.",
         "input_schema": {
@@ -71,7 +93,7 @@ _CLAUDE_TOOLS = [
             },
             "required": ["symbol", "side", "entry", "take_profit", "stop_loss"],
         },
-    }
+    },
 ]
 
 
@@ -129,16 +151,18 @@ class MasterClaude:
             self._route_tools,
             {
                 "master_agent": "master_agent",
+                "analysis_agent": "analysis_agent",
                 "generate_response": "generate_response",
             },
         )
 
-        # analysis_agent → decision_agent or master_agent only
+        # analysis_agent → decision_agent, tools_agent (fetch data), master_agent, or wrap up
         workflow.add_conditional_edges(
             "analysis_agent",
             self._route_analysis,
             {
                 "decision_agent": "decision_agent",
+                "tools_agent": "tools_agent",
                 "master_agent": "master_agent",
                 "generate_response": "generate_response",
             },
@@ -183,7 +207,20 @@ class MasterClaude:
     def _route_tools(self, state: MasterState) -> str:
         if state["step_count"] >= state["max_steps"]:
             return "generate_response"
-        return "master_agent"
+
+        raw = state.get("agent_response") or _DEFAULT_RESPONSE
+        clean = raw.strip("`").removeprefix("json").strip()
+        try:
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            return "master_agent"
+
+        type_value = data.get("type", "GENERAL_QUERY")
+        route = _ROUTE_MAP.get(type_value, "master_agent")
+        # tools_agent can only reach these three nodes
+        if route not in {"analysis_agent", "master_agent", "generate_response"}:
+            return "master_agent"
+        return route
 
     def _route_analysis(self, state: MasterState) -> str:
         if state["step_count"] >= state["max_steps"]:
@@ -199,6 +236,10 @@ class MasterClaude:
         type_value = data.get("type", "GENERAL_QUERY")
         if type_value == "TRADE_DECISION":
             return "decision_agent"
+        if type_value == "TOOL_AGENT":
+            return "tools_agent"
+        if type_value == "FINAL_RESPONSE":
+            return "generate_response"
         return "master_agent"
 
     # ------------------------------------------------------------------
@@ -340,8 +381,10 @@ class MasterClaude:
                         state["user_feedback"] = (
                             f"{label}\n\n**Tool executed:** `{tool_name}`\n\n{tool_result_str}"
                         )
-                        # Route back to master_agent so it can summarise the tool result
-                        state["agent_response"] = json.dumps({"type": "GENERAL_QUERY"})
+                        # smc_analysis → return to analysis_agent to continue its job.
+                        # create_order (or any other tool) → go straight to final response.
+                        next_type = "MARKET_ANALYSIS" if tool_name == "smc_analysis" else "FINAL_RESPONSE"
+                        state["agent_response"] = json.dumps({"type": next_type})
             except (json.JSONDecodeError, Exception):
                 pass  # Not a tool call — treat as normal routing response
 
