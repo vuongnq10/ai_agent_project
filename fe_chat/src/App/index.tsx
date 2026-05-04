@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import "../App.css";
 import { TIMEFRAMES, type Timeframe } from "../constants";
-import { coins } from "../coins";
+import { coins as defaultCoins } from "../coins";
 import Header from "./components/Header";
 import CoinList from "./components/CoinList";
 import LeveragePanel from "./components/LeveragePanel";
@@ -11,6 +11,7 @@ import ChartPanel from "./components/Chart";
 import { useChat } from "../hooks/useChat";
 import { useTheme } from "../hooks/useTheme";
 import { fetchModels, type AgentId, type AIModel } from "../services/chatService";
+import { fetchPairs } from "../services/tradingService";
 
 // const FALLBACK_AGENTS: AIModel[] = [
 //   { id: "gemini", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
@@ -24,9 +25,8 @@ import { fetchModels, type AgentId, type AIModel } from "../services/chatService
 
 function getUrlParams(): { coin: string; tf: Timeframe } {
   const sp = new URLSearchParams(window.location.search);
-  const coinParam = sp.get("coin") ?? "BTCUSDT";
+  const coin = sp.get("coin") ?? "BTCUSDT";
   const tfParam = sp.get("tf") ?? "1h";
-  const coin = coins.includes(coinParam) ? coinParam : "BTCUSDT";
   const tf = (TIMEFRAMES as readonly string[]).includes(tfParam) ? (tfParam as Timeframe) : "1h";
   return { coin, tf };
 }
@@ -39,6 +39,7 @@ function updateUrlParam(key: string, value: string) {
 
 export default function App() {
   const [theme, toggleTheme] = useTheme();
+  const [coins, setCoins] = useState<string[]>(defaultCoins);
   const [agents, setAgents] = useState<AIModel[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AIModel | null>(null);
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
@@ -90,6 +91,10 @@ export default function App() {
       .catch(() => {/* keep fallback */ });
   }, []);
 
+  useEffect(() => {
+    fetchPairs().then(setCoins).catch(() => {/* keep default */});
+  }, []);
+
   const handleCoinChange = (coin: string) => {
     setSelectedCoin(coin);
     updateUrlParam("coin", coin);
@@ -117,11 +122,11 @@ export default function App() {
       />
       {showLeverage && (
         <div className="leverage-popover">
-          <LeveragePanel />
+          <LeveragePanel coins={coins} />
         </div>
       )}
       <div className="workspace">
-        <CoinList onCoinClick={handleCoinChange} selectedCoin={selectedCoin} />
+        <CoinList coins={coins} onCoinClick={handleCoinChange} selectedCoin={selectedCoin} />
         <div className="chart-workspace">
           <ChartPanel
             symbol={selectedCoin}

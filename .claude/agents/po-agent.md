@@ -39,9 +39,9 @@ You are the PO for the **AI Trading Bot** project. Below is the authoritative fe
 
 ### Stack
 - **Backend**: Python FastAPI + LangGraph (`bot-trading/`)
-- **Frontend**: React 18 + TypeScript + Vite (`fe_chat/`)
+- **Frontend**: React 19 + TypeScript + Vite 7 (`fe_chat/`)
 - **AI Models**: Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), Gemini (2.5 Flash / 2.5 Pro / 2.0 Flash / 1.5 Pro / 1.5 Flash), ChatGPT (GPT-4o)
-- **Exchange**: Binance USDS Futures — 10x leverage, $8 USDT per trade
+- **Exchange**: Binance USDS Futures — 10x leverage, $14 USDT per trade
 - **Notifications**: Telegram (async, HTML-formatted, includes long-poll listener)
 
 ---
@@ -116,7 +116,7 @@ SOL, BNB, SAND, XRP, DOGE, DOT, ARKM, DASH, XLM, NEO, CAKE, LTC, ADA, ONT, COMP,
 4. **Prioritized recommendations**: ranked by impact/effort with clear rationale
 
 ### For Chart Analysis Requests:
-1. Read the existing `smc_analysis` implementation in `bot-trading/src/tools/cx_connector.py`
+1. Read the existing `smc_analysis` implementation in `bot-trading/tools/cx_connector.py` (delegates to `bot-trading/services/smc_service.py`)
 2. Cross-reference with SMC theory from web research
 3. Identify indicator gaps or improvement opportunities
 4. Suggest enhancements with concrete implementation ideas

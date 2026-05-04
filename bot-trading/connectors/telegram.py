@@ -688,6 +688,19 @@ async def _cmd_cancel_all(*_):
         await telegram_bot(f"❌ /cancel_all error: {e}")
 
 
+async def _cmd_pairs(*_):
+    try:
+        from routers.trading import TRADING_PAIRS
+        lines = [f"<b>Trading Pairs ({len(TRADING_PAIRS)})</b>"]
+        for pair in TRADING_PAIRS:
+            lines.append("")
+            lines.append(f"/order {pair}")
+            lines.append("")
+        await telegram_bot("\n".join(lines))
+    except Exception as e:
+        await telegram_bot(f"Error: {e}")
+
+
 async def _cmd_help(*_):
     try:
         await telegram_bot(
@@ -714,6 +727,7 @@ async def _cmd_help(*_):
             "<b>Bot</b>\n"
             "/status — uptime and environment\n"
             "/leverage SOLUSDT 10 — set leverage for symbol\n"
+            "/pairs — list all supported trading pairs\n"
             "/help — this message"
         )
     except Exception as e:
@@ -735,6 +749,7 @@ _COMMAND_MAP = {
     "/order": _cmd_order,
     "/status": _cmd_status,
     "/leverage": _cmd_leverage,
+    "/pairs": _cmd_pairs,
     "/help": _cmd_help,
 }
 

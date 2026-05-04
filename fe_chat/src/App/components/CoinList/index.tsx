@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { coins } from "../../../coins";
 
 interface Props {
+  coins: string[];
   onCoinClick: (coin: string) => void;
   selectedCoin?: string;
 }
 
-export default function CoinList({ onCoinClick, selectedCoin }: Props) {
+export default function CoinList({ coins, onCoinClick, selectedCoin }: Props) {
   const [search, setSearch] = useState("");
 
   const filtered = coins.filter((c) =>

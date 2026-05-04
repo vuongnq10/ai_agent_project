@@ -25,8 +25,30 @@ cx_connector = CXConnector()
 _CX_TOOLS = Tool(
     function_declarations=[
         FunctionDeclaration(
+            name="smc_analysis",
+            description="Fetch live OHLCV candles from Binance and compute SMC indicators: ATR, swing highs/lows, order blocks, Fair Value Gaps, BOS, CHoCH, liquidity levels, Bollinger Bands, EMA, and RSI.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Trading pair symbol (e.g., 'SOLUSDT', 'BTCUSDT').",
+                    },
+                    "timeframe": {
+                        "type": "string",
+                        "description": "Candle timeframe (e.g., '30m', '1h', '4h'). Defaults to '1h'.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of candles to fetch. Defaults to 200.",
+                    },
+                },
+                "required": ["symbol"],
+            },
+        ),
+        FunctionDeclaration(
             name="create_order",
-            description="Save a 20 leverage trade setup with entry, stop loss, and take profit.",
+            description="Place a 10x leverage bracket order (entry + TP + SL) on Binance Futures.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -44,7 +66,7 @@ _CX_TOOLS = Tool(
                     },
                     "entry": {
                         "type": "number",
-                        "description": "Entry price for the trade. ",
+                        "description": "Entry price for the trade.",
                     },
                     "stop_loss": {
                         "type": "string",
@@ -96,7 +118,6 @@ class MasterState(TypedDict):
     model: str
 
 
-
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
@@ -117,9 +138,9 @@ class MasterGemini:
         workflow.add_node("decision_agent", self._decision_agent)
         workflow.add_node("generate_response", self._generate_response)
 
-        # init_flow always proceeds to master_agent
         workflow.add_edge("init_flow", "master_agent")
 
+        # master_agent → any node
         workflow.add_conditional_edges(
             "master_agent",
             self._routing,
@@ -132,20 +153,30 @@ class MasterGemini:
             },
         )
 
-        workflow.add_edge("tools_agent", "generate_response")
+        # tools_agent → master_agent only (generate_response on max_steps)
+        workflow.add_conditional_edges(
+            "tools_agent",
+            self._route_tools,
+            {
+                "master_agent": "master_agent",
+                "analysis_agent": "analysis_agent",
+                "generate_response": "generate_response",
+            },
+        )
 
+        # analysis_agent → decision_agent, tools_agent (fetch data), master_agent, or wrap up
         workflow.add_conditional_edges(
             "analysis_agent",
-            self._routing,
+            self._route_analysis,
             {
-                "tools_agent": "tools_agent",
-                "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",
+                "tools_agent": "tools_agent",
                 "master_agent": "master_agent",
                 "generate_response": "generate_response",
             },
         )
 
+        # decision_agent → any node
         workflow.add_conditional_edges(
             "decision_agent",
             self._routing,
@@ -164,7 +195,7 @@ class MasterGemini:
         return workflow.compile(checkpointer=memory)
 
     # ------------------------------------------------------------------
-    # Router
+    # Routers
     # ------------------------------------------------------------------
     def _routing(self, state: MasterState) -> str:
         if state["step_count"] >= state["max_steps"]:
@@ -181,11 +212,49 @@ class MasterGemini:
         type_value = data.get("type", "GENERAL_QUERY")
         return _ROUTE_MAP.get(type_value, "master_agent")
 
+    def _route_tools(self, state: MasterState) -> str:
+        if state["step_count"] >= state["max_steps"]:
+            return "generate_response"
+
+        raw = state.get("agent_response") or _DEFAULT_RESPONSE
+        clean = raw.strip("`").removeprefix("json").strip()
+        try:
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            return "master_agent"
+
+        type_value = data.get("type", "GENERAL_QUERY")
+        route = _ROUTE_MAP.get(type_value, "master_agent")
+        # tools_agent can only reach these three nodes
+        if route not in {"analysis_agent", "master_agent", "generate_response"}:
+            return "master_agent"
+        return route
+
+    def _route_analysis(self, state: MasterState) -> str:
+        if state["step_count"] >= state["max_steps"]:
+            return "generate_response"
+
+        raw = state.get("agent_response") or _DEFAULT_RESPONSE
+        clean = raw.strip("`").removeprefix("json").strip()
+        try:
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            return "master_agent"
+
+        type_value = data.get("type", "GENERAL_QUERY")
+        if type_value == "TRADE_DECISION":
+            return "decision_agent"
+        if type_value == "TOOL_AGENT":
+            return "tools_agent"
+        if type_value == "FINAL_RESPONSE":
+            return "generate_response"
+        return "master_agent"
+
     # ------------------------------------------------------------------
     # Helper: parse thought + response text out of a Gemini response
     # ------------------------------------------------------------------
     def _parse_response(self, response) -> dict:
-        """Return ``{"thought": str, "agent_response": str}`` from a Gemini response."""
+        """Return {"thought": str, "agent_response": str} from a Gemini response."""
         parts = response.candidates[0].content.parts
 
         thought = ""
@@ -202,10 +271,19 @@ class MasterGemini:
     # ------------------------------------------------------------------
     # Helper: apply parsed response fields back onto state
     # ------------------------------------------------------------------
-    def _apply_parsed_response(self, state: MasterState, parsed: dict) -> None:
-        """Mutate *state* in-place with thought and agent_response from *parsed*."""
-        if parsed["thought"]:
-            state["user_feedback"] = parsed["thought"]
+    def _apply_parsed_response(
+        self, state: MasterState, parsed: dict, label: str = ""
+    ) -> None:
+        """Mutate state in-place with thought and agent_response from parsed.
+
+        Always updates user_feedback so the streamed output shows the actual
+        agent response after every step, not just the step header.
+        """
+        response_text = parsed["thought"] or parsed["agent_response"]
+        if response_text:
+            header = f"{label}\n\n" if label else ""
+            state["user_feedback"] = header + response_text
+
         if parsed["agent_response"]:
             state["agent_response"] = parsed["agent_response"]
             state["chat_history"].append(
@@ -223,7 +301,8 @@ class MasterGemini:
         return state
 
     def _call_master(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = f"# Master Agent — step {state['step_count']}"
+        label = f"# Master Agent — step {state['step_count']}"
+        state["user_feedback"] = label
 
         if state["step_count"] == 0:
             state["chat_history"] = [
@@ -238,7 +317,7 @@ class MasterGemini:
         print("Master Agent response:", response)
         print("*" * 20)
 
-        self._apply_parsed_response(state, self._parse_response(response))
+        self._apply_parsed_response(state, self._parse_response(response), label=label)
         state["step_count"] += 1
         return state
 
@@ -252,7 +331,7 @@ class MasterGemini:
             print("*" * 20)
 
             parsed = self._parse_response(response)
-            self._apply_parsed_response(state, parsed)
+            self._apply_parsed_response(state, parsed, label=label)
 
             # Execute any function calls returned by the model
             candidate = response.candidates[0]
@@ -274,6 +353,9 @@ class MasterGemini:
                         )
                     )
                     state["user_feedback"] = f"{label}\n\n**Tool executed:** `{func_call.name}`\n\n{tool_result_str}"
+                    # smc_analysis → continue to analysis_agent; any other tool → wrap up
+                    next_type = "MARKET_ANALYSIS" if func_call.name == "smc_analysis" else "FINAL_RESPONSE"
+                    state["agent_response"] = json.dumps({"type": next_type})
 
             state["step_count"] += 1
             return state
@@ -283,7 +365,8 @@ class MasterGemini:
 
     def _analyse_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Analysis Agent — step {state['step_count']}"
+            label = f"# Analysis Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(
                 state["chat_history"],
@@ -293,7 +376,7 @@ class MasterGemini:
             print("Analysis Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            self._apply_parsed_response(state, self._parse_response(response), label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -302,7 +385,8 @@ class MasterGemini:
 
     def _decision_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Decision Agent — step {state['step_count']}"
+            label = f"# Decision Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(
                 state["chat_history"],
@@ -312,7 +396,7 @@ class MasterGemini:
             print("Decision Agent response:", response)
             print("*" * 20)
 
-            self._apply_parsed_response(state, self._parse_response(response))
+            self._apply_parsed_response(state, self._parse_response(response), label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -333,7 +417,7 @@ class MasterGemini:
         if is_routing_json or not raw:
             history = list(state.get("chat_history", []))
             history.append(Content(role="user", parts=[Part.from_text(
-                text="Based on the conversation so far, write the final answer for the user. Do not use JSON."
+                text="Based on the conversation so far, write a clear, concise final answer for the user. Do not use JSON — write in plain prose."
             )]))
             response = agent(history, system_instruction=_FINAL_RESPONSE_SYSTEM, model=state["model"])
             parsed = self._parse_response(response)

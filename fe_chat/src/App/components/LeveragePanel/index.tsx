@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { coins } from "../../../coins";
 import { useLeverage } from "../../../hooks/useLeverage";
 
-export default function LeveragePanel() {
+interface Props {
+  coins: string[];
+}
+
+export default function LeveragePanel({ coins }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set(["SOLUSDT"]));
   const [value, setValue] = useState(20);
   const { status, bulkResults, loading, applyBulkLeverage } = useLeverage();

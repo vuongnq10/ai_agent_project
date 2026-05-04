@@ -8,6 +8,15 @@ _smc_service = SmcService()
 
 trading = APIRouter()
 
+TRADING_PAIRS = [
+    'SOLUSDT', 'BNBUSDT', 'SANDUSDT', 'XRPUSDT', 'DOGEUSDT', 'BUSDT',
+    'BIOUSDT', 'SKYAIUSDT', 'ORCAUSDT', 'HYPEUSDT', 'TAGUSDT', 'ORDIUSDT',
+    'CLUSDT', 'TAOUSDT', 'KNCUSDT', 'DOTUSDT', 'ARKMUSDT', 'DASHUSDT',
+    'XLMUSDT', 'LTCUSDT', 'ADAUSDT', 'AVAXUSDT', 'TIAUSDT', 'SEIUSDT',
+    'SUIUSDT', 'INJUSDT', 'ATOMUSDT', 'UNIUSDT', 'ARUSDT', 'NEARUSDT',
+    'TRXUSDT', 'ZECUSDT', 'LINKUSDT', 'IPUSDT', 'ICPUSDT', 'APTUSDT',
+]
+
 AI_MODELS = [
     {"id": "claude", "label": "Claude Opus 4.6", "model": "claude-opus-4-6"},
     {"id": "claude", "label": "Claude Sonnet 4.6", "model": "claude-sonnet-4-6"},
@@ -24,6 +33,11 @@ AI_MODELS = [
 @trading.get("/models")
 async def get_models():
     return AI_MODELS
+
+
+@trading.get("/pairs")
+async def get_pairs():
+    return {"pairs": TRADING_PAIRS}
 
 
 class LeverageRequest(BaseModel):

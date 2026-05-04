@@ -37,8 +37,24 @@ _CHATGPT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "smc_analysis",
+            "description": "Fetch live OHLCV candles from Binance and compute SMC indicators: ATR, swing highs/lows, order blocks, Fair Value Gaps, BOS, CHoCH, liquidity levels, Bollinger Bands, EMA, and RSI.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Trading pair symbol (e.g. 'SOLUSDT', 'BTCUSDT')."},
+                    "timeframe": {"type": "string", "description": "Candle timeframe (e.g. '30m', '1h', '4h'). Defaults to '1h'."},
+                    "limit": {"type": "integer", "description": "Number of candles to fetch. Defaults to 200."},
+                },
+                "required": ["symbol"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_order",
-            "description": "Save a 20x leverage trade setup with entry, stop loss, and take profit on Binance Futures.",
+            "description": "Place a 10x leverage bracket order (entry + TP + SL) on Binance Futures.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -52,10 +68,13 @@ _CHATGPT_TOOLS = [
                 "required": ["symbol", "side", "entry", "take_profit", "stop_loss"],
             },
         },
-    }
+    },
 ]
 
 
+# ---------------------------------------------------------------------------
+# LangGraph state
+# ---------------------------------------------------------------------------
 class MasterState(TypedDict):
     chat_history: List[dict]
     agent_response: str
@@ -66,11 +85,16 @@ class MasterState(TypedDict):
     model: str
 
 
-
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
 class MasterChatGPT:
     def __init__(self):
         self.graph = self._build_graph()
 
+    # ------------------------------------------------------------------
+    # Graph construction
+    # ------------------------------------------------------------------
     def _build_graph(self):
         workflow = StateGraph(MasterState)
 
@@ -83,6 +107,7 @@ class MasterChatGPT:
 
         workflow.add_edge("init_flow", "master_agent")
 
+        # master_agent → any node
         workflow.add_conditional_edges(
             "master_agent",
             self._routing,
@@ -95,20 +120,30 @@ class MasterChatGPT:
             },
         )
 
-        workflow.add_edge("tools_agent", "generate_response")
+        # tools_agent → master_agent only (generate_response on max_steps)
+        workflow.add_conditional_edges(
+            "tools_agent",
+            self._route_tools,
+            {
+                "master_agent": "master_agent",
+                "analysis_agent": "analysis_agent",
+                "generate_response": "generate_response",
+            },
+        )
 
+        # analysis_agent → decision_agent, tools_agent (fetch data), master_agent, or wrap up
         workflow.add_conditional_edges(
             "analysis_agent",
-            self._routing,
+            self._route_analysis,
             {
-                "tools_agent": "tools_agent",
-                "analysis_agent": "analysis_agent",
                 "decision_agent": "decision_agent",
+                "tools_agent": "tools_agent",
                 "master_agent": "master_agent",
                 "generate_response": "generate_response",
             },
         )
 
+        # decision_agent → any node
         workflow.add_conditional_edges(
             "decision_agent",
             self._routing,
@@ -126,6 +161,9 @@ class MasterChatGPT:
 
         return workflow.compile(checkpointer=memory)
 
+    # ------------------------------------------------------------------
+    # Routers
+    # ------------------------------------------------------------------
     def _routing(self, state: MasterState) -> str:
         if state["step_count"] >= state["max_steps"]:
             return "generate_response"
@@ -141,11 +179,52 @@ class MasterChatGPT:
         type_value = data.get("type", "GENERAL_QUERY")
         return _ROUTE_MAP.get(type_value, "master_agent")
 
+    def _route_tools(self, state: MasterState) -> str:
+        if state["step_count"] >= state["max_steps"]:
+            return "generate_response"
+
+        raw = state.get("agent_response") or _DEFAULT_RESPONSE
+        clean = raw.strip("`").removeprefix("json").strip()
+        try:
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            return "master_agent"
+
+        type_value = data.get("type", "GENERAL_QUERY")
+        route = _ROUTE_MAP.get(type_value, "master_agent")
+        # tools_agent can only reach these three nodes
+        if route not in {"analysis_agent", "master_agent", "generate_response"}:
+            return "master_agent"
+        return route
+
+    def _route_analysis(self, state: MasterState) -> str:
+        if state["step_count"] >= state["max_steps"]:
+            return "generate_response"
+
+        raw = state.get("agent_response") or _DEFAULT_RESPONSE
+        clean = raw.strip("`").removeprefix("json").strip()
+        try:
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            return "master_agent"
+
+        type_value = data.get("type", "GENERAL_QUERY")
+        if type_value == "TRADE_DECISION":
+            return "decision_agent"
+        if type_value == "TOOL_AGENT":
+            return "tools_agent"
+        if type_value == "FINAL_RESPONSE":
+            return "generate_response"
+        return "master_agent"
+
+    # ------------------------------------------------------------------
+    # Helper: parse an OpenAI response object
+    # ------------------------------------------------------------------
     def _parse_response(self, response) -> dict:
-        """Return {"thought": str, "agent_response": str, "tool_calls": list|None}."""
+        """Return {"thought": str, "agent_response": str, "tool_calls": list|None, "message": obj}."""
         message = response.choices[0].message
         agent_response = message.content or ""
-        tool_calls = message.tool_calls  # list of ChatCompletionMessageToolCall or None
+        tool_calls = message.tool_calls
 
         return {
             "thought": "",
@@ -154,12 +233,16 @@ class MasterChatGPT:
             "message": message,
         }
 
-    def _apply_parsed_response(self, state: MasterState, parsed: dict) -> None:
-        message = parsed["message"]
+    # ------------------------------------------------------------------
+    # Helper: apply parsed response fields back onto state
+    # ------------------------------------------------------------------
+    def _apply_parsed_response(
+        self, state: MasterState, parsed: dict, label: str = ""
+    ) -> None:
         tool_calls = parsed["tool_calls"]
 
         if tool_calls:
-            # Append full assistant message with tool_calls for OpenAI continuity
+            # Append full assistant message with tool_calls for OpenAI conversation continuity
             state["chat_history"].append({
                 "role": "assistant",
                 "content": parsed["agent_response"] or None,
@@ -177,17 +260,23 @@ class MasterChatGPT:
             })
         elif parsed["agent_response"]:
             state["agent_response"] = parsed["agent_response"]
+            header = f"{label}\n\n" if label else ""
+            state["user_feedback"] = header + parsed["agent_response"]
             state["chat_history"].append({
                 "role": "assistant",
                 "content": parsed["agent_response"],
             })
 
+    # ------------------------------------------------------------------
+    # Nodes
+    # ------------------------------------------------------------------
     def _init_flow(self, state: MasterState) -> MasterState:
         state["user_feedback"] = "# Starting flow"
         return state
 
     def _call_master(self, state: MasterState) -> MasterState:
-        state["user_feedback"] = f"# Master Agent — step {state['step_count']}"
+        label = f"# Master Agent — step {state['step_count']}"
+        state["user_feedback"] = label
 
         if state["step_count"] == 0:
             state["chat_history"] = [
@@ -203,9 +292,7 @@ class MasterChatGPT:
         print("*" * 20)
 
         parsed = self._parse_response(response)
-        if parsed["agent_response"]:
-            state["agent_response"] = parsed["agent_response"]
-        self._apply_parsed_response(state, parsed)
+        self._apply_parsed_response(state, parsed, label=label)
         state["step_count"] += 1
         return state
 
@@ -219,10 +306,7 @@ class MasterChatGPT:
             print("*" * 20)
 
             parsed = self._parse_response(response)
-            self._apply_parsed_response(state, parsed)
-
-            if parsed["agent_response"]:
-                state["agent_response"] = parsed["agent_response"]
+            self._apply_parsed_response(state, parsed, label=label)
 
             # Execute tool calls
             if parsed["tool_calls"]:
@@ -236,6 +320,9 @@ class MasterChatGPT:
                         "content": tool_result_str,
                     })
                     state["user_feedback"] = f"{label}\n\n**Tool executed:** `{tc.function.name}`\n\n{tool_result_str}"
+                    # smc_analysis → continue to analysis_agent; any other tool → wrap up
+                    next_type = "MARKET_ANALYSIS" if tc.function.name == "smc_analysis" else "FINAL_RESPONSE"
+                    state["agent_response"] = json.dumps({"type": next_type})
 
             state["step_count"] += 1
             return state
@@ -245,16 +332,15 @@ class MasterChatGPT:
 
     def _analyse_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Analysis Agent — step {state['step_count']}"
+            label = f"# Analysis Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(state["chat_history"], system=_ANALYSIS_SYSTEM_INSTRUCTION, model=state["model"])
             print("Analysis Agent response:", response)
             print("*" * 20)
 
             parsed = self._parse_response(response)
-            if parsed["agent_response"]:
-                state["agent_response"] = parsed["agent_response"]
-            self._apply_parsed_response(state, parsed)
+            self._apply_parsed_response(state, parsed, label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -263,16 +349,15 @@ class MasterChatGPT:
 
     def _decision_agent(self, state: MasterState) -> MasterState:
         try:
-            state["user_feedback"] = f"# Decision Agent — step {state['step_count']}"
+            label = f"# Decision Agent — step {state['step_count']}"
+            state["user_feedback"] = label
 
             response = agent(state["chat_history"], system=_DECISION_SYSTEM_INSTRUCTION, model=state["model"])
             print("Decision Agent response:", response)
             print("*" * 20)
 
             parsed = self._parse_response(response)
-            if parsed["agent_response"]:
-                state["agent_response"] = parsed["agent_response"]
-            self._apply_parsed_response(state, parsed)
+            self._apply_parsed_response(state, parsed, label=label)
             state["step_count"] += 1
             return state
         except Exception as e:
@@ -291,8 +376,12 @@ class MasterChatGPT:
             pass
 
         if is_routing_json or not raw:
+            final_prompt = (
+                "Based on the conversation so far, write a clear, concise final "
+                "answer for the user. Do not use JSON — write in plain prose."
+            )
             history = list(state.get("chat_history", []))
-            history.append({"role": "user", "content": "Based on the conversation so far, write the final answer for the user. Do not use JSON."})
+            history.append({"role": "user", "content": final_prompt})
             response = agent(history, system=_FINAL_RESPONSE_SYSTEM, model=state["model"])
             parsed = self._parse_response(response)
             state["user_feedback"] = parsed["agent_response"] or raw
@@ -300,6 +389,9 @@ class MasterChatGPT:
             state["user_feedback"] = raw
         return state
 
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
     def __call__(self, prompt: str, session_id: str = "default_session", model: str = "gpt-4o"):
         initial_state: MasterState = {
             "agent_response": "",

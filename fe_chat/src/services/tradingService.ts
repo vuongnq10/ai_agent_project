@@ -140,3 +140,9 @@ export async function smcAnalysis(
   const res = await fetch(`${BOT_BASE_URL}/trading/smc?${params}`);
   return res.json();
 }
+
+export async function fetchPairs(): Promise<string[]> {
+  const res = await fetch(`${BOT_BASE_URL}/trading/pairs`);
+  const data = await res.json();
+  return data.pairs ?? [];
+}

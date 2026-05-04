@@ -41,8 +41,8 @@ Extract from the po-agent response:
 ### Step 2 — Read Relevant Codebase Context
 
 Before creating the plan, read the files most likely to be touched:
-- For BE tasks: check `bot-trading/src/tools/cx_connector.py`, `bot-trading/gemini/agents_gemini/agentic_agent.py`, `bot-trading/main.py`
-- For FE tasks: check `fe_chat/src/App/index.tsx`, `fe_chat/src/App/types.ts`, relevant component files
+- For BE tasks: check `bot-trading/tools/cx_connector.py`, `bot-trading/services/smc_service.py`, `bot-trading/agents/gemini/agentic_agent.py`, `bot-trading/main.py`
+- For FE tasks: check `fe_chat/src/App/index.tsx`, `fe_chat/src/App/types.ts`, relevant component files under `fe_chat/src/components/`
 
 ### Step 3 — Create Implementation Plan
 
