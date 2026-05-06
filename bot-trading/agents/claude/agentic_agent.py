@@ -352,7 +352,9 @@ class MasterClaude:
             response = agent(
                 state["chat_history"],
                 system=system_with_tools,
-                model=state["model"],
+                # model=state["model"],
+                # Use less capable model for tools to encourage simpler
+                model="claude-haiku-4-5-20251001",
             )
             print("Tool Agent response:", response)
             print("*" * 20)
@@ -383,7 +385,11 @@ class MasterClaude:
                         )
                         # smc_analysis → return to analysis_agent to continue its job.
                         # create_order (or any other tool) → go straight to final response.
-                        next_type = "MARKET_ANALYSIS" if tool_name == "smc_analysis" else "FINAL_RESPONSE"
+                        next_type = (
+                            "MARKET_ANALYSIS"
+                            if tool_name == "smc_analysis"
+                            else "FINAL_RESPONSE"
+                        )
                         state["agent_response"] = json.dumps({"type": next_type})
             except (json.JSONDecodeError, Exception):
                 pass  # Not a tool call — treat as normal routing response
@@ -469,7 +475,10 @@ class MasterClaude:
             history = list(state.get("chat_history", []))
             history.append({"role": "user", "content": final_prompt})
             final_text = agent(
-                history, system=_FINAL_RESPONSE_SYSTEM, model=state["model"]
+                history,
+                system=_FINAL_RESPONSE_SYSTEM,
+                # model=state["model"]
+                model="claude-haiku-4-5-20251001",
             )
             state["user_feedback"] = final_text or raw
         else:
