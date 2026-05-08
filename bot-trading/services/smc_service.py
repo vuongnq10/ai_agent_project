@@ -1,27 +1,10 @@
-import httpx
+from services.candle_service import CandleService
+from services.wyckoff_service import WyckoffService
+
+_candle_service = CandleService()
 
 
 class SmcService:
-    BINANCE_FUTURES_URL = "https://fapi.binance.com/fapi/v1"
-
-    def fetch_candles(self, symbol: str, timeframe: str, limit: int = 300) -> list[dict]:
-        url = f"{self.BINANCE_FUTURES_URL}/klines"
-        params = {"symbol": symbol, "interval": timeframe, "limit": limit}
-        with httpx.Client(timeout=10) as client:
-            resp = client.get(url, params=params)
-            resp.raise_for_status()
-        return [
-            {
-                "timestamp": int(k[0]),
-                "open": float(k[1]),
-                "high": float(k[2]),
-                "low": float(k[3]),
-                "close": float(k[4]),
-                "volume": float(k[5]),
-            }
-            for k in resp.json()
-        ]
-
     def _calc_atr(self, candles: list[dict], period: int = 14) -> float:
         if len(candles) < period + 1:
             return 0.0
@@ -407,7 +390,7 @@ class SmcService:
 
     def smc_analysis(self, symbol: str, timeframe: str = "1h", limit: int = 200) -> dict:
         try:
-            candles = self.fetch_candles(symbol, timeframe, limit=limit)
+            candles = _candle_service.fetch_candles(symbol, timeframe, limit=limit)
             smc = self._calc_smc(candles)
             indicators = self._calc_classic_indicators(candles)
             current_price = candles[-1]["close"]

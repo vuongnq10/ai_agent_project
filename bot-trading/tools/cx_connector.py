@@ -1,8 +1,12 @@
 from connectors.binance_v2 import BinanceConnector
+from services.candle_service import CandleService
 from services.smc_service import SmcService
+from services.wyckoff_service import WyckoffService
 
 binance_connector = BinanceConnector()
+_candle_service = CandleService()
 _smc_service = SmcService()
+_wyckoff_service = WyckoffService()
 
 
 class CXConnector:
@@ -34,5 +38,8 @@ class CXConnector:
             return {"status": "error", "message": str(e)}
 
     def get_ticker(self, symbol: str, timeframe: str = "1h"):
-        candles = _smc_service.fetch_candles(symbol, timeframe, limit=100)
+        candles = _candle_service.fetch_candles(symbol, timeframe, limit=100)
         return {"result": candles}
+
+    def wyckoff_analysis(self, symbol: str, timeframe: str = "1h", limit: int = 200) -> dict:
+        return _wyckoff_service.wyckoff_analysis(symbol, timeframe, limit)
