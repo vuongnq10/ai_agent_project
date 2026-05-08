@@ -91,16 +91,31 @@ export default function SMCPanel({ candles, smcData }: Props) {
   const rsiValues: [number, number | null][] = [[7, rsi7], [14, rsi14], [21, rsi21]];
   const emaValues: [number, number | null][] = [[9, ema9], [20, ema20], [50, ema50]];
 
+  const emaStack =
+    ema9 != null && ema20 != null && ema50 != null
+      ? ema9 > ema20 && ema20 > ema50
+        ? { label: "Bull", color: "#089981" }
+        : ema9 < ema20 && ema20 < ema50
+        ? { label: "Bear", color: "#f23645" }
+        : { label: "Mixed", color: "#f59e0b" }
+      : null;
+
   return (
     <div className="smc-strip">
 
-      {/* ── Market Structure ───────────────── */}
-      <div className="smc-section">
+      {/* ── 1. Structure (highest priority) ── */}
+      <div className="smc-section smc-section--primary">
         <div className="smc-sec-title">Structure</div>
         <div className="smc-stat-row">
           <span className="smc-stat-label">Trend</span>
-          <span className="smc-strip-badge" style={{ color: trendColor, background: `${trendColor}18` }}>
+          <span className="smc-strip-badge" style={{ color: trendColor, background: `${trendColor}1a`, border: `1px solid ${trendColor}40` }}>
             {trendArrow} {smcData.trend.toUpperCase()}
+          </span>
+        </div>
+        <div className="smc-stat-row">
+          <span className="smc-stat-label">Zone</span>
+          <span className="smc-strip-badge" style={{ color: pdColor, background: `${pdColor}1a`, border: `1px solid ${pdColor}40` }}>
+            {smcData.premiumDiscountZone.toUpperCase()}
           </span>
         </div>
         <div className="smc-stat-row">
@@ -120,89 +135,19 @@ export default function SMCPanel({ candles, smcData }: Props) {
           ) : <span className="smc-stat-val smc-none">—</span>}
         </div>
         <div className="smc-stat-row">
-          <span className="smc-stat-label">ATR (14)</span>
+          <span className="smc-stat-label">ATR 14</span>
           <span className="smc-stat-val" style={{ color: "#f59e0b" }}>{atr > 0 ? fmt(atr) : "—"}</span>
         </div>
-        <div className="smc-stat-row">
-          <span className="smc-stat-label">Swings H/L</span>
-          <span className="smc-stat-val">{smcData.swingHighs.length} / {smcData.swingLows.length}</span>
-        </div>
       </div>
 
       <div className="smc-vsep" />
 
-      {/* ── Order Blocks ───────────────────── */}
-      <div className="smc-section" style={{ minWidth: 200 }}>
+      {/* ── 2. Entries (highest trader value) ── */}
+      <div className="smc-section" style={{ minWidth: 230 }}>
         <div className="smc-sec-title">
-          Order Blocks
-          {activeBullOBs.length + activeBearOBs.length > 0 && (
-            <span style={{ color: "#f59e0b", marginLeft: 5 }}>
-              {activeBullOBs.length + activeBearOBs.length} active
-            </span>
-          )}
-        </div>
-        {activeBullOBs.length === 0 && activeBearOBs.length === 0 && (
-          <span className="smc-stat-val smc-none">No active OBs</span>
-        )}
-        {activeBullOBs.map((ob, i) => (
-          <div key={`b${i}`} className="smc-stat-row">
-            <span className="smc-ob-tag bull">Bull</span>
-            <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(ob.low)} – {fmt(ob.high)}</span>
-            <span className="smc-dist">+{distPct(ob.high, currentPrice)}</span>
-            <span className="smc-strength-badge" style={{ background: `hsl(${ob.strength}, 70%, 35%)` }}>{ob.strength}%</span>
-          </div>
-        ))}
-        {activeBearOBs.map((ob, i) => (
-          <div key={`s${i}`} className="smc-stat-row">
-            <span className="smc-ob-tag bear">Bear</span>
-            <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(ob.low)} – {fmt(ob.high)}</span>
-            <span className="smc-dist">-{distPct(ob.low, currentPrice)}</span>
-            <span className="smc-strength-badge" style={{ background: `hsl(${ob.strength}, 70%, 35%)` }}>{ob.strength}%</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="smc-vsep" />
-
-      {/* ── Fair Value Gaps ────────────────── */}
-      <div className="smc-section" style={{ minWidth: 200 }}>
-        <div className="smc-sec-title">
-          Fair Value Gaps
-          {bullFVGs.length + bearFVGs.length > 0 && (
-            <span style={{ color: "#f59e0b", marginLeft: 5 }}>
-              {bullFVGs.length + bearFVGs.length} open
-            </span>
-          )}
-        </div>
-        {bullFVGs.length === 0 && bearFVGs.length === 0 && (
-          <span className="smc-stat-val smc-none">No open FVGs</span>
-        )}
-        {bullFVGs.map((fvg, i) => (
-          <div key={`bf${i}`} className="smc-stat-row">
-            <span className="smc-fvg-tag bull">↑ FVG</span>
-            <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(fvg.low)} – {fmt(fvg.high)}</span>
-            <span className="smc-dist">{gapSizePct(fvg.high, fvg.low, currentPrice)}</span>
-            <span className="smc-strength-badge" style={{ background: `hsl(${fvg.strength}, 70%, 35%)` }}>{fvg.strength}%</span>
-          </div>
-        ))}
-        {bearFVGs.map((fvg, i) => (
-          <div key={`sf${i}`} className="smc-stat-row">
-            <span className="smc-fvg-tag bear">↓ FVG</span>
-            <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(fvg.low)} – {fmt(fvg.high)}</span>
-            <span className="smc-dist">{gapSizePct(fvg.high, fvg.low, currentPrice)}</span>
-            <span className="smc-strength-badge" style={{ background: `hsl(${fvg.strength}, 70%, 35%)` }}>{fvg.strength}%</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="smc-vsep" />
-
-      {/* ── Potential Entries ──────────────── */}
-      <div className="smc-section" style={{ minWidth: 220 }}>
-        <div className="smc-sec-title">
-          Potential Entries
+          Entries
           {topEntries.length > 0 && (
-            <span style={{ color: "#f59e0b", marginLeft: 5 }}>{topEntries.length} signal{topEntries.length > 1 ? "s" : ""}</span>
+            <span className="smc-sec-badge smc-sec-badge--yellow">{topEntries.length} signal{topEntries.length > 1 ? "s" : ""}</span>
           )}
         </div>
         {topEntries.length === 0 && (
@@ -215,21 +160,21 @@ export default function SMCPanel({ candles, smcData }: Props) {
               style={{
                 color: e.type === "bullish" ? "#089981" : "#f23645",
                 background: e.type === "bullish" ? "#08998118" : "#f2364518",
-                border: `1px solid ${e.type === "bullish" ? "#089981" : "#f23645"}`,
+                border: `1px solid ${e.type === "bullish" ? "#08998140" : "#f2364540"}`,
               }}
             >
               {e.type === "bullish" ? "↑ LONG" : "↓ SHORT"}
             </span>
-            <span className="smc-stat-val" style={{ color: e.type === "bullish" ? "#089981" : "#f23645" }}>
+            <span className="smc-stat-val" style={{ color: e.type === "bullish" ? "#089981" : "#f23645", flex: 1 }}>
               {fmt(e.zoneLow)} – {fmt(e.zoneHigh)}
             </span>
             <span className="smc-dist">{e.distancePct.toFixed(2)}%</span>
             <span
               className="smc-confluence-badge"
               style={{
-                background: e.confluenceScore >= 70 ? "#f59e0b22" : "#ffffff10",
-                border: `1px solid ${e.confluenceScore >= 70 ? "#f59e0b" : "#4b5563"}`,
-                color: e.confluenceScore >= 70 ? "#f59e0b" : "#9ca3af",
+                background: e.confluenceScore >= 70 ? "#f59e0b22" : "#ffffff0d",
+                border: `1px solid ${e.confluenceScore >= 70 ? "#f59e0b66" : "#ffffff1a"}`,
+                color: e.confluenceScore >= 70 ? "#f59e0b" : "#6b7280",
               }}
             >
               {e.confluenceScore}%
@@ -240,44 +185,74 @@ export default function SMCPanel({ candles, smcData }: Props) {
 
       <div className="smc-vsep" />
 
-      {/* ── Premium / Discount ─────────────── */}
-      <div className="smc-section" style={{ minWidth: 165 }}>
-        <div className="smc-sec-title">Premium / Discount</div>
-        <div className="smc-stat-row">
-          <span className="smc-stat-label">Zone</span>
-          <span className="smc-strip-badge" style={{ color: pdColor, background: `${pdColor}18` }}>
-            {smcData.premiumDiscountZone.toUpperCase()}
-          </span>
+      {/* ── 3. Order Blocks ── */}
+      <div className="smc-section" style={{ minWidth: 210 }}>
+        <div className="smc-sec-title">
+          Order Blocks
+          {activeBullOBs.length + activeBearOBs.length > 0 && (
+            <span className="smc-sec-badge smc-sec-badge--yellow">{activeBullOBs.length + activeBearOBs.length} active</span>
+          )}
         </div>
-        <div className="smc-mini-gauge">
-          <div className="smc-mini-gauge-fill" style={{ width: `${Math.min(100, Math.max(0, smcData.premiumDiscountPct))}%`, background: pdColor }} />
-        </div>
-        <div className="smc-stat-row">
-          <span className="smc-stat-label">Pos</span>
-          <span className="smc-stat-val" style={{ color: pdColor }}>{smcData.premiumDiscountPct.toFixed(1)}%</span>
-        </div>
-        <div className="smc-stat-row">
-          <span className="smc-stat-label">EQ</span>
-          <span className="smc-stat-val" style={{ color: "#f59e0b" }}>{fmt(smcData.equilibrium)}</span>
-        </div>
-        <div className="smc-stat-row">
-          <span className="smc-stat-label">High</span>
-          <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(smcData.rangeHigh)}</span>
-        </div>
-        <div className="smc-stat-row">
-          <span className="smc-stat-label">Low</span>
-          <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(smcData.rangeLow)}</span>
-        </div>
+        {activeBullOBs.length === 0 && activeBearOBs.length === 0 && (
+          <span className="smc-stat-val smc-none">No active OBs</span>
+        )}
+        {activeBullOBs.map((ob, i) => (
+          <div key={`b${i}`} className="smc-stat-row">
+            <span className="smc-ob-tag bull">Bull</span>
+            <span className="smc-stat-val" style={{ color: "#089981", flex: 1 }}>{fmt(ob.low)} – {fmt(ob.high)}</span>
+            <span className="smc-dist">+{distPct(ob.high, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${ob.strength}, 65%, 32%)` }}>{ob.strength}%</span>
+          </div>
+        ))}
+        {activeBearOBs.map((ob, i) => (
+          <div key={`s${i}`} className="smc-stat-row">
+            <span className="smc-ob-tag bear">Bear</span>
+            <span className="smc-stat-val" style={{ color: "#f23645", flex: 1 }}>{fmt(ob.low)} – {fmt(ob.high)}</span>
+            <span className="smc-dist">-{distPct(ob.low, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${ob.strength}, 65%, 32%)` }}>{ob.strength}%</span>
+          </div>
+        ))}
       </div>
 
       <div className="smc-vsep" />
 
-      {/* ── Liquidity ──────────────────────── */}
+      {/* ── 4. Fair Value Gaps ── */}
+      <div className="smc-section" style={{ minWidth: 210 }}>
+        <div className="smc-sec-title">
+          FVGs
+          {bullFVGs.length + bearFVGs.length > 0 && (
+            <span className="smc-sec-badge smc-sec-badge--yellow">{bullFVGs.length + bearFVGs.length} open</span>
+          )}
+        </div>
+        {bullFVGs.length === 0 && bearFVGs.length === 0 && (
+          <span className="smc-stat-val smc-none">No open FVGs</span>
+        )}
+        {bullFVGs.map((fvg, i) => (
+          <div key={`bf${i}`} className="smc-stat-row">
+            <span className="smc-fvg-tag bull">↑ FVG</span>
+            <span className="smc-stat-val" style={{ color: "#089981", flex: 1 }}>{fmt(fvg.low)} – {fmt(fvg.high)}</span>
+            <span className="smc-dist">{gapSizePct(fvg.high, fvg.low, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${fvg.strength}, 65%, 32%)` }}>{fvg.strength}%</span>
+          </div>
+        ))}
+        {bearFVGs.map((fvg, i) => (
+          <div key={`sf${i}`} className="smc-stat-row">
+            <span className="smc-fvg-tag bear">↓ FVG</span>
+            <span className="smc-stat-val" style={{ color: "#f23645", flex: 1 }}>{fmt(fvg.low)} – {fmt(fvg.high)}</span>
+            <span className="smc-dist">{gapSizePct(fvg.high, fvg.low, currentPrice)}</span>
+            <span className="smc-strength-badge" style={{ background: `hsl(${fvg.strength}, 65%, 32%)` }}>{fvg.strength}%</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="smc-vsep" />
+
+      {/* ── 5. Liquidity ── */}
       <div className="smc-section smc-liq-section">
-        <div className="smc-sec-title">Liquidity Pools</div>
+        <div className="smc-sec-title">Liquidity</div>
         <div className="smc-liq-cols">
           <div className="smc-liq-col">
-            <div className="smc-liq-col-label" style={{ color: "#f23645" }}>↑ BSL above</div>
+            <div className="smc-liq-col-label" style={{ color: "#f23645" }}>BSL above</div>
             {bslAbove.length === 0 ? (
               <span className="smc-stat-val smc-none">—</span>
             ) : bslAbove.map((p, i) => (
@@ -288,7 +263,7 @@ export default function SMCPanel({ candles, smcData }: Props) {
             ))}
           </div>
           <div className="smc-liq-col">
-            <div className="smc-liq-col-label" style={{ color: "#089981" }}>↓ SSL below</div>
+            <div className="smc-liq-col-label" style={{ color: "#089981" }}>SSL below</div>
             {sslBelow.length === 0 ? (
               <span className="smc-stat-val smc-none">—</span>
             ) : sslBelow.map((p, i) => (
@@ -303,8 +278,8 @@ export default function SMCPanel({ candles, smcData }: Props) {
 
       <div className="smc-vsep" />
 
-      {/* ── RSI ────────────────────────────── */}
-      <div className="smc-section" style={{ minWidth: 130 }}>
+      {/* ── 6. RSI ── */}
+      <div className="smc-section" style={{ minWidth: 128 }}>
         <div className="smc-sec-title">RSI</div>
         {rsiValues.map(([period, val]) => (
           <div key={period} className="smc-stat-row">
@@ -312,31 +287,30 @@ export default function SMCPanel({ candles, smcData }: Props) {
             {val != null ? (
               <span className="smc-stat-val" style={{ color: rsiColor(val) }}>
                 {val.toFixed(1)}
-                {val >= 70 ? " ▲OB" : val <= 30 ? " ▼OS" : ""}
+                {val >= 70 ? " OB" : val <= 30 ? " OS" : ""}
               </span>
             ) : <span className="smc-stat-val smc-none">—</span>}
           </div>
         ))}
         {rsi14 != null && (
-          <>
-            <div className="smc-mini-gauge" style={{ marginTop: 2 }}>
-              <div
-                className="smc-mini-gauge-fill"
-                style={{
-                  width: `${Math.min(100, Math.max(0, rsi14))}%`,
-                  background: rsiColor(rsi14),
-                }}
-              />
-            </div>
-          </>
+          <div className="smc-mini-gauge" style={{ marginTop: 3 }}>
+            <div className="smc-mini-gauge-fill" style={{ width: `${Math.min(100, Math.max(0, rsi14))}%`, background: rsiColor(rsi14) }} />
+          </div>
         )}
       </div>
 
       <div className="smc-vsep" />
 
-      {/* ── EMA ────────────────────────────── */}
-      <div className="smc-section" style={{ minWidth: 155 }}>
-        <div className="smc-sec-title">EMA</div>
+      {/* ── 7. EMA + Stack ── */}
+      <div className="smc-section" style={{ minWidth: 160 }}>
+        <div className="smc-sec-title">
+          EMA
+          {emaStack && (
+            <span className="smc-sec-badge" style={{ color: emaStack.color, background: `${emaStack.color}18`, border: `1px solid ${emaStack.color}40` }}>
+              {emaStack.label}
+            </span>
+          )}
+        </div>
         {emaValues.map(([period, val]) => (
           <div key={period} className="smc-stat-row">
             <span className="smc-stat-label">EMA {period}</span>
@@ -347,32 +321,19 @@ export default function SMCPanel({ candles, smcData }: Props) {
             ) : <span className="smc-stat-val smc-none">—</span>}
           </div>
         ))}
-        <div className="smc-stat-row" style={{ marginTop: 2 }}>
-          <span className="smc-stat-label">Stack</span>
-          {ema9 != null && ema20 != null && ema50 != null ? (
-            <span className="smc-stat-val" style={{
-              color: ema9 > ema20 && ema20 > ema50 ? "#089981"
-                : ema9 < ema20 && ema20 < ema50 ? "#f23645"
-                : "#f59e0b"
-            }}>
-              {ema9 > ema20 && ema20 > ema50 ? "↑ Bull"
-                : ema9 < ema20 && ema20 < ema50 ? "↓ Bear"
-                : "Mixed"}
-            </span>
-          ) : <span className="smc-stat-val smc-none">—</span>}
-        </div>
       </div>
 
       <div className="smc-vsep" />
 
-      {/* ── Bollinger Bands ────────────────── */}
+      {/* ── 8. Bollinger Bands ── */}
       <div className="smc-section" style={{ minWidth: 155 }}>
         <div className="smc-sec-title">
           BB (20,2)
           {bbPctB != null && (
-            <span style={{
+            <span className="smc-sec-badge" style={{
               color: bbPctB > 80 ? "#f23645" : bbPctB < 20 ? "#089981" : "#f59e0b",
-              marginLeft: 5,
+              background: bbPctB > 80 ? "#f2364518" : bbPctB < 20 ? "#08998118" : "#f59e0b18",
+              border: `1px solid ${bbPctB > 80 ? "#f2364540" : bbPctB < 20 ? "#08998140" : "#f59e0b40"}`,
             }}>
               {bbPctB.toFixed(0)}%B
             </span>
@@ -399,22 +360,46 @@ export default function SMCPanel({ candles, smcData }: Props) {
         {bb.upper != null && bb.lower != null && (
           <div className="smc-stat-row">
             <span className="smc-stat-label">Width</span>
-            <span className="smc-stat-val" style={{ color: "#9ca3af" }}>
-              {gapSizePct(bb.upper, bb.lower, currentPrice)}
-            </span>
+            <span className="smc-stat-val" style={{ color: "#9ca3af" }}>{gapSizePct(bb.upper, bb.lower, currentPrice)}</span>
           </div>
         )}
         {bbPctB != null && (
-          <div className="smc-mini-gauge" style={{ marginTop: 2 }}>
-            <div
-              className="smc-mini-gauge-fill"
-              style={{
-                width: `${Math.min(100, Math.max(0, bbPctB))}%`,
-                background: bbPctB > 80 ? "#f23645" : bbPctB < 20 ? "#089981" : "#f59e0b",
-              }}
-            />
+          <div className="smc-mini-gauge" style={{ marginTop: 3 }}>
+            <div className="smc-mini-gauge-fill" style={{
+              width: `${Math.min(100, Math.max(0, bbPctB))}%`,
+              background: bbPctB > 80 ? "#f23645" : bbPctB < 20 ? "#089981" : "#f59e0b",
+            }} />
           </div>
         )}
+      </div>
+
+      {/* ── 9. P/D Zone (condensed, last) ── */}
+      <div className="smc-vsep" />
+      <div className="smc-section" style={{ minWidth: 148 }}>
+        <div className="smc-sec-title">Range</div>
+        <div className="smc-stat-row">
+          <span className="smc-stat-label">Pos</span>
+          <span className="smc-stat-val" style={{ color: pdColor }}>{smcData.premiumDiscountPct.toFixed(1)}%</span>
+        </div>
+        <div className="smc-mini-gauge">
+          <div className="smc-mini-gauge-fill" style={{ width: `${Math.min(100, Math.max(0, smcData.premiumDiscountPct))}%`, background: pdColor }} />
+        </div>
+        <div className="smc-stat-row">
+          <span className="smc-stat-label">EQ</span>
+          <span className="smc-stat-val" style={{ color: "#f59e0b" }}>{fmt(smcData.equilibrium)}</span>
+        </div>
+        <div className="smc-stat-row">
+          <span className="smc-stat-label">High</span>
+          <span className="smc-stat-val" style={{ color: "#f23645" }}>{fmt(smcData.rangeHigh)}</span>
+        </div>
+        <div className="smc-stat-row">
+          <span className="smc-stat-label">Low</span>
+          <span className="smc-stat-val" style={{ color: "#089981" }}>{fmt(smcData.rangeLow)}</span>
+        </div>
+        <div className="smc-stat-row">
+          <span className="smc-stat-label">Swings</span>
+          <span className="smc-stat-val">{smcData.swingHighs.length}H / {smcData.swingLows.length}L</span>
+        </div>
       </div>
 
     </div>

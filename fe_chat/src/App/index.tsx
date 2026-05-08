@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import "../App.css";
 import { TIMEFRAMES, type Timeframe } from "../constants";
 import { coins as defaultCoins } from "../coins";
@@ -12,16 +12,6 @@ import { useChat } from "../hooks/useChat";
 import { useTheme } from "../hooks/useTheme";
 import { fetchModels, type AgentId, type AIModel } from "../services/chatService";
 import { fetchPairs } from "../services/tradingService";
-
-// const FALLBACK_AGENTS: AIModel[] = [
-//   { id: "gemini", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
-//   { id: "gemini", label: "Gemini 2.5 Pro", model: "gemini-2.5-pro" },
-//   { id: "gemini", label: "Gemini 2.0 Flash", model: "gemini-2.0-flash" },
-//   { id: "gemini", label: "Gemini 1.5 Pro", model: "gemini-1.5-pro" },
-//   { id: "gemini", label: "Gemini 1.5 Flash", model: "gemini-1.5-flash" },
-//   { id: "claude", label: "Claude", model: "claude-opus-4-6" },
-//   { id: "chatgpt", label: "ChatGPT", model: "gpt-4o" },
-// ];
 
 function getUrlParams(): { coin: string; tf: Timeframe } {
   const sp = new URLSearchParams(window.location.search);
@@ -42,45 +32,11 @@ export default function App() {
   const [coins, setCoins] = useState<string[]>(defaultCoins);
   const [agents, setAgents] = useState<AIModel[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AIModel | null>(null);
-  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const activeAgent = selectedAgent ?? { id: "gemini" as AgentId, model: "", label: "" };
   const { message, setMessage, chatHistory, loading, submit, clearHistory } = useChat(activeAgent.id, activeAgent.model);
   const [selectedCoin, setSelectedCoin] = useState(() => getUrlParams().coin);
   const [timeframe, setTimeframe] = useState<Timeframe>(() => getUrlParams().tf);
   const [showLeverage, setShowLeverage] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(380);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const startWidth = useRef(0);
-
-  const onDragStart = useCallback((e: React.MouseEvent) => {
-    isDragging.current = true;
-    startX.current = e.clientX;
-    startWidth.current = sidebarWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-      const delta = startX.current - e.clientX;
-      const newWidth = Math.min(600, Math.max(260, startWidth.current + delta));
-      setSidebarWidth(newWidth);
-    };
-    const onMouseUp = () => {
-      if (!isDragging.current) return;
-      isDragging.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    return () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-  }, []);
 
   useEffect(() => {
     fetchModels()
@@ -88,7 +44,7 @@ export default function App() {
         setAgents(data);
         setSelectedAgent(data[0] ?? null);
       })
-      .catch(() => {/* keep fallback */ });
+      .catch(() => {/* keep fallback */});
   }, []);
 
   useEffect(() => {
@@ -110,6 +66,12 @@ export default function App() {
     submit(query);
   };
 
+  const handleAgentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const [id, model] = e.target.value.split(":");
+    const found = agents.find((a) => a.id === id && a.model === model);
+    if (found) setSelectedAgent(found);
+  };
+
   return (
     <div className="app-container">
       <Header
@@ -127,7 +89,7 @@ export default function App() {
       )}
       <div className="workspace">
         <CoinList coins={coins} onCoinClick={handleCoinChange} selectedCoin={selectedCoin} />
-        <div className="chart-workspace">
+        <div className="chart-area">
           <ChartPanel
             symbol={selectedCoin}
             timeframe={timeframe}
@@ -135,43 +97,26 @@ export default function App() {
             theme={theme}
           />
         </div>
-        <div className="workspace-divider" onMouseDown={onDragStart} />
-        <aside className="chat-sidebar" style={{ width: sidebarWidth, flexShrink: 0 }}>
-          <div className="chat-header">
-            <div className="chat-header-title">
-              <div className="chat-online-dot" />
-              AI Trading Assistant
+        <aside className="chat-panel">
+          <div className="chat-toolbar">
+            <div className="chat-toolbar-title">
+              <span className="live-dot" />
+              AI ASSISTANT
             </div>
-            <div className="agent-switcher">
-              <button
-                className="agent-trigger"
-                onClick={() => setAgentMenuOpen((v) => !v)}
-              >
-                <span className="agent-trigger-label">{activeAgent.label}</span>
-                <span className="agent-trigger-model">{activeAgent.model}</span>
-                <svg
-                  className={`agent-trigger-chevron${agentMenuOpen ? " open" : ""}`}
-                  width="10" height="10" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5"
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {agentMenuOpen && (
-                <div className="agent-menu">
-                  {agents.map((a) => (
-                    <button
-                      key={`${a.id}-${a.model}`}
-                      className={`agent-menu-item${a.model === selectedAgent?.model ? " active" : ""}`}
-                      onClick={() => { setSelectedAgent(a); setAgentMenuOpen(false); }}
-                    >
-                      <span className="agent-menu-label">{a.label}</span>
-                      <span className="agent-menu-model">{a.model}</span>
-                    </button>
-                  ))}
-                </div>
+            <select
+              className="agent-select"
+              value={activeAgent.model ? `${activeAgent.id}:${activeAgent.model}` : ""}
+              onChange={handleAgentChange}
+            >
+              {agents.length === 0 && (
+                <option value="">Loading models...</option>
               )}
-            </div>
+              {agents.map((a) => (
+                <option key={`${a.id}-${a.model}`} value={`${a.id}:${a.model}`}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
           </div>
           <Messages chatHistory={chatHistory} loading={loading} />
           <Input

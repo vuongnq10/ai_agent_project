@@ -8,11 +8,11 @@ interface Props {
 
 export default function TimeframeSelector({ value, onChange }: Props) {
   return (
-    <div className="timeframe-selector">
+    <div className="tf-group">
       {TIMEFRAMES.map((tf) => (
         <button
           key={tf}
-          className={`tf-btn ${value === tf ? "active" : ""}`}
+          className={`tf-btn${value === tf ? " active" : ""}`}
           onClick={() => onChange(tf)}
         >
           {tf}

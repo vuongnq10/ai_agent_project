@@ -17,6 +17,7 @@ export default function CoinList({ coins, onCoinClick, selectedCoin }: Props) {
     <div className="coin-sidebar">
       <div className="coin-sidebar-header">
         <span className="coin-sidebar-title">Markets</span>
+        <span className="coin-sidebar-count">{filtered.length}</span>
       </div>
       <div className="coin-search-wrap">
         <input
@@ -27,20 +28,26 @@ export default function CoinList({ coins, onCoinClick, selectedCoin }: Props) {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
-      <div className="coin-sidebar-list">
+      <div className="coin-list">
         {filtered.length === 0 ? (
-          <div className="coin-item" style={{ color: "var(--text-muted)", cursor: "default" }}>No results</div>
+          <div className="coin-empty">
+            <span>No results</span>
+          </div>
         ) : (
-          filtered.map((coin) => (
-            <div
-              key={coin}
-              className={`coin-item${selectedCoin === coin ? " selected" : ""}`}
-              onClick={() => onCoinClick(coin)}
-            >
-              <span className="coin-item-base">{coin.replace("USDT", "")}</span>
-              <span className="coin-item-quote">USDT</span>
-            </div>
-          ))
+          filtered.map((coin) => {
+            const isActive = selectedCoin === coin;
+            const base = coin.replace("USDT", "");
+            return (
+              <div
+                key={coin}
+                className={`coin-row${isActive ? " active" : ""}`}
+                onClick={() => onCoinClick(coin)}
+                title={coin}
+              >
+                <span className="coin-row-symbol">{base}</span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>
