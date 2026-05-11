@@ -152,7 +152,7 @@ make a final trading decision: BUY, SELL, or WAIT.
   Place the limit at the zone and let price come to you.
 - Stop loss: below the 2h bullish OB low (for longs); above the 2h bearish OB high (for shorts).
 - Take profit: target the nearest opposing liquidity pool (buy-side for longs, sell-side for shorts).
-- Loss tolerance: ~10–12% of position (at 20x leverage). Take profit: ~15–20%.
+- Loss tolerance: ~10–12% of position (at 15x leverage). Take profit: ~15–20%.
 
 === REVERSAL EXCEPTION (use sparingly) ===
 If 4h structure is strongly bearish but a fresh bullish CHoCH just fired on 4h

@@ -26,20 +26,20 @@ If any argument is missing, ask the user to provide it before proceeding.
 
 The `create_order` tool in `CXConnector` places **3 orders** simultaneously on Binance USDS Futures:
 
-| # | Type                  | Description                                    |
-|---|-----------------------|------------------------------------------------|
-| 1 | `LIMIT`               | Entry order at the specified price             |
-| 2 | `TAKE_PROFIT_MARKET`  | Auto-closes position when TP price is reached  |
-| 3 | `STOP_MARKET`         | Auto-closes position when SL price is reached  |
+| #   | Type                 | Description                                   |
+| --- | -------------------- | --------------------------------------------- |
+| 1   | `LIMIT`              | Entry order at the specified price            |
+| 2   | `TAKE_PROFIT_MARKET` | Auto-closes position when TP price is reached |
+| 3   | `STOP_MARKET`        | Auto-closes position when SL price is reached |
 
 ## Trade Parameters
 
-| Parameter     | Value                    |
-|---------------|--------------------------|
-| Leverage      | **20x**                  |
-| Order amount  | **$5 USDT**              |
-| TP % (raw)    | 0.40% (leveraged = 8%)   |
-| SL % (raw)    | 0.75% (leveraged = 15%)  |
+| Parameter    | Value                   |
+| ------------ | ----------------------- |
+| Leverage     | **15x**                 |
+| Order amount | **$5 USDT**             |
+| TP % (raw)   | 0.40% (leveraged = 8%)  |
+| SL % (raw)   | 0.75% (leveraged = 15%) |
 
 > Note: The system uses internal TP/SL percentages from `BinanceConnector`. The `stop_loss` and `take_profit` values passed to `create_order` are used as hints to the AI agent but the actual prices are recalculated from `EXPECTED_PROFIT` and `EXPECTED_STOP_LOSS` constants.
 
@@ -61,10 +61,11 @@ The `create_order` tool in `CXConnector` places **3 orders** simultaneously on B
 ```
 
 Places a BUY bracket order on SOLUSDT:
+
 - Entry: $130.50 (LIMIT)
 - Stop loss: $128.00 (STOP_MARKET)
 - Take profit: $135.00 (TAKE_PROFIT_MARKET)
-- Leverage: 20x, Amount: $5 USDT
+- Leverage: 15x, Amount: $5 USDT
 
 ## Steps
 

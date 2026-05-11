@@ -52,21 +52,21 @@ export default function Input({ message, loading, selectedCoin, onChange, onSubm
         className="quick-btn"
         onClick={handleQuickSmc}
         disabled={busy}
-        title={`Fetch SMC data for ${selectedCoin} on 30m / 2h / 4h and send to AI`}
+        title={`Fetch SMC + Wyckoff data for ${selectedCoin} on 30m / 2h / 4h and send to AI`}
       >
         {fetching ? (
           <>
             <svg className="animate-spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M21 12a9 9 0 11-6.219-8.56"/>
             </svg>
-            Fetching SMC data...
+            Fetching SMC + Wyckoff data...
           </>
         ) : (
           <>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
             </svg>
-            Quick SMC Analysis — 30m / 2h / 4h
+            Quick SMC + Wyckoff — 30m / 2h / 4h
           </>
         )}
       </button>

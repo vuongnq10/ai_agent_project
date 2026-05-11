@@ -141,6 +141,71 @@ export async function smcAnalysis(
   return res.json();
 }
 
+// ─── Wyckoff Analysis Types ────────────────────────────────────────────────────
+
+export type WyckoffPhase =
+  | 'UNDEFINED'
+  | 'ACCUMULATION_A' | 'ACCUMULATION_B' | 'ACCUMULATION_C' | 'ACCUMULATION_D' | 'ACCUMULATION_E'
+  | 'DISTRIBUTION_A' | 'DISTRIBUTION_B' | 'DISTRIBUTION_C' | 'DISTRIBUTION_D' | 'DISTRIBUTION_E';
+
+export type WyckoffBias = 'bullish' | 'bearish' | 'neutral';
+
+export interface WyckoffEvent {
+  event_type: 'SC' | 'BC' | 'AR' | 'ST' | 'SPRING' | 'UTAD' | 'SOS' | 'SOW' | 'LPS' | 'LPSY';
+  bar_index: number;
+  price: number;
+  volume: number;
+  volume_ratio: number;
+  spread_ratio: number;
+  close_ratio: number;
+  quality_score: number;
+}
+
+export interface WyckoffAnalysisResult {
+  symbol: string;
+  timeframe: string;
+  phase: WyckoffPhase;
+  phase_confidence: number;
+  events: WyckoffEvent[];
+  range_high: number | null;
+  range_low: number | null;
+  range_midpoint: number | null;
+  spring_low: number | null;
+  utad_high: number | null;
+  lps_level: number | null;
+  lpsy_level: number | null;
+  target_minimum: number | null;
+  target_moderate: number | null;
+  target_maximum: number | null;
+  vol_sma20: number;
+  phase_b_up_vol: number;
+  phase_b_down_vol: number;
+  volume_asymmetry: number;
+  spring_quality: number | null;
+  wyckoff_smc_bias: WyckoffBias;
+  smc_score_bonus: number;
+}
+
+export interface WyckoffAnalysisResponse {
+  result?: WyckoffAnalysisResult;
+  status?: 'error';
+  message?: string;
+}
+
+export async function wyckoffAnalysis(
+  symbol: string,
+  timeframe = '1h',
+  limit = 200,
+): Promise<WyckoffAnalysisResponse> {
+  const params = new URLSearchParams({
+    symbol,
+    timeframe,
+    limit: String(limit),
+  });
+  const res = await fetch(`${BOT_BASE_URL}/trading/wyckoff?${params}`);
+  return res.json();
+}
+
 export async function fetchPairs(): Promise<string[]> {
   const res = await fetch(`${BOT_BASE_URL}/trading/pairs`);
   const data = await res.json();

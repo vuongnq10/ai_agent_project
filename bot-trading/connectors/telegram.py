@@ -227,7 +227,7 @@ def _build_smc_order_prompt(symbol: str, tf_results: list) -> str:
     ]
     parts = [
         f"The following SMC analysis was fetched from the backend for {symbol}.",
-        "Analyze the multi-timeframe data (4h bias → 2h setup → 30m execution), determine the highest-probability SMC trade setup at 20x leverage (target +15–20% account / -10–12% max loss, min RR 1.5), then create an order if conditions are met.",
+        "Analyze the multi-timeframe data (4h bias → 2h setup → 30m execution), determine the highest-probability SMC trade setup at 15x leverage (target +15–20% account / -10–12% max loss, min RR 1.5), then create an order if conditions are met.",
         "",
         "---",
         "",

@@ -1,5 +1,8 @@
-import { smcAnalysis } from './tradingService';
-import type { SmcAnalysisResult } from './tradingService';
+import { smcAnalysis, wyckoffAnalysis } from './tradingService';
+import type {
+  SmcAnalysisResult,
+  WyckoffAnalysisResult,
+} from './tradingService';
 
 const TIMEFRAMES = [
   { label: '4h', interval: '4h' },
@@ -117,30 +120,86 @@ function formatSMC(
   return lines.join('\n');
 }
 
+function formatWyckoff(
+  symbol: string,
+  tf: string,
+  data: WyckoffAnalysisResult,
+): string {
+  const fmt = (n: number | null, d = 4) =>
+    n != null ? fixNumber(n, d) : 'n/a';
+  const recentEvents = data.events.slice(0, 5);
+
+  const lines: string[] = [
+    `#### Wyckoff — ${symbol} ${tf}`,
+    `Phase: ${data.phase} (confidence ${fixNumber(data.phase_confidence, 2)})`,
+    `Bias: ${data.wyckoff_smc_bias.toUpperCase()}  smc_score_bonus=${data.smc_score_bonus}`,
+    ``,
+    `**Range**`,
+    `High: ${fmt(data.range_high)}  Mid: ${fmt(data.range_midpoint)}  Low: ${fmt(data.range_low)}`,
+    `Spring Low: ${fmt(data.spring_low)} (quality=${data.spring_quality ?? 'n/a'})  UTAD High: ${fmt(data.utad_high)}`,
+    `LPS: ${fmt(data.lps_level)}  LPSY: ${fmt(data.lpsy_level)}`,
+    ``,
+    `**Cause & Effect Targets**`,
+    `Min: ${fmt(data.target_minimum)}  Mod: ${fmt(data.target_moderate)}  Max: ${fmt(data.target_maximum)}`,
+    ``,
+    `**Volume**`,
+    `vol_sma20: ${fixNumber(data.vol_sma20, 2)}  ` +
+      `phase_b_up: ${fixNumber(data.phase_b_up_vol, 2)}  ` +
+      `phase_b_down: ${fixNumber(data.phase_b_down_vol, 2)}  ` +
+      `asymmetry: ${fixNumber(data.volume_asymmetry, 3)}`,
+    ``,
+    `**Recent Events**`,
+    recentEvents.length === 0
+      ? 'none'
+      : recentEvents
+          .map(
+            (e) =>
+              `  ${e.event_type} @ bar ${e.bar_index}: price=${fixNumber(e.price)}  vol_ratio=${e.volume_ratio}  spread_ratio=${e.spread_ratio}  cr=${e.close_ratio}  quality=${e.quality_score}`,
+          )
+          .join('\n'),
+  ];
+
+  return lines.join('\n');
+}
+
 export async function buildSmcQuery(
   symbol: string,
   userNote: string,
 ): Promise<string> {
   const results = await Promise.all(
     TIMEFRAMES.map(async ({ label, interval }) => {
-      const response = await smcAnalysis(symbol, interval);
-      if (!response.result) {
-        return `### ${symbol} — ${label} Timeframe\nError: ${response.message ?? 'Unknown error'}`;
-      }
-      return formatSMC(symbol, label, response.result);
+      const [smcRes, wyRes] = await Promise.all([
+        smcAnalysis(symbol, interval),
+        wyckoffAnalysis(symbol, interval),
+      ]);
+
+      const smcSection = smcRes.result
+        ? formatSMC(symbol, label, smcRes.result)
+        : `### ${symbol} — ${label} Timeframe\nSMC error: ${smcRes.message ?? 'Unknown error'}`;
+
+      const wySection = wyRes.result
+        ? formatWyckoff(symbol, label, wyRes.result)
+        : `#### Wyckoff — ${symbol} ${label}\nWyckoff error: ${wyRes.message ?? 'Unknown error'}`;
+
+      return `${smcSection}\n\n${wySection}`;
     }),
   );
 
   const header = [
-    `SMC multi-timeframe analysis for ${symbol} (4h bias → 2h setup → 30m execution).`,
+    `SMC + Wyckoff multi-timeframe analysis for ${symbol} (4h bias → 2h setup → 30m execution).`,
     ``,
     `Apply the 3-step hierarchy:`,
-    `  1. 4h BIAS — determine trend direction from trend/BOS/CHoCH/OB/zone`,
-    `  2. 2h POI  — find the highest-confluence unmitigated OB + unfilled FVG zone aligned with the 4h bias`,
-    `  3. 30m TRIGGER — confirm entry via CHoCH (or internal_last_choch) at or near the 2h POI`,
+    `  1. 4h BIAS — determine trend direction from trend/BOS/CHoCH/OB/zone, cross-checked with 4h Wyckoff phase & bias`,
+    `  2. 2h POI  — find the highest-confluence unmitigated OB + unfilled FVG zone aligned with the 4h bias; prefer POIs near 2h Wyckoff Spring/UTAD/LPS/LPSY or range edges`,
+    `  3. 30m TRIGGER — confirm entry via CHoCH (or internal_last_choch) at or near the 2h POI; 30m Wyckoff SOS/SOW or SPRING/UTAD adds confluence`,
+    ``,
+    `Wyckoff overlay rules:`,
+    `  • Phase C/D accumulation → bullish bias; phase C/D distribution → bearish bias.`,
+    `  • Use Wyckoff Cause & Effect targets as additional take-profit references.`,
+    `  • Volume asymmetry >1.3 confirms the dominant phase direction.`,
     ``,
     `Then apply the 5-gate model (Bias / Zone / POI / Trigger / R:R).`,
-    `At 20x leverage: max loss ~10–12% account, target profit ~15–20%, min R:R 1.5.`,
+    `At 15x leverage: max loss ~10–12% account, target profit ~15–20%, min R:R 1.5.`,
     `Place a limit order at the POI if price has not yet pulled back.`,
     ``,
     `---`,

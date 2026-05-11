@@ -62,7 +62,7 @@ _CLAUDE_TOOLS = [
     },
     {
         "name": "create_order",
-        "description": "Save a 20x leverage trade setup with entry, stop loss, and take profit on Binance Futures.",
+        "description": "Save a 15x leverage trade setup with entry, stop loss, and take profit on Binance Futures.",
         "input_schema": {
             "type": "object",
             "properties": {

@@ -3,8 +3,10 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from connectors.binance_v2 import BinanceConnector
 from services.smc_service import SmcService
+from services.wyckoff_service import WyckoffService
 
 _smc_service = SmcService()
+_wyckoff_service = WyckoffService()
 
 trading = APIRouter()
 
@@ -43,14 +45,14 @@ TRADING_PAIRS = [
   "XLMUSDT",
   "DOGEUSDT",
   "SANDUSDT",
-  "HBARNUSDT",
+  "HBARUSDT",
   "MORPHOUSDT",
   "ASTERUSDT",
   "BIOUSDT",
   "TAGUSDT",
   "BUSDT",
   "CLUSDT",
-  "SKYAIUSDT"
+  "SKYUSDT"
 ]
 
 AI_MODELS = [
@@ -105,6 +107,15 @@ async def get_smc_analysis(
     limit: int = Query(200, ge=50, le=1000, description="Number of candles to fetch"),
 ):
     return _smc_service.smc_analysis(symbol, timeframe, limit)
+
+
+@trading.get("/wyckoff")
+async def get_wyckoff_analysis(
+    symbol: str = Query(..., description="Trading pair symbol, e.g. BTCUSDT"),
+    timeframe: str = Query("1h", description="Candle timeframe, e.g. 1h, 4h, 1d"),
+    limit: int = Query(200, ge=50, le=1000, description="Number of candles to fetch"),
+):
+    return _wyckoff_service.wyckoff_analysis(symbol, timeframe, limit)
 
 
 @trading.post("/leverage/bulk")
